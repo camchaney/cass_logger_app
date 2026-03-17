@@ -2,6 +2,8 @@
 
 Simple Python package for developers to interface with the Cass Logger. This package allows users to perform simple operations on the logger and download/process data.
 
+> **Platform support:** macOS and Linux only. Windows is not currently supported.
+
 ## 🛠️ How to Use
 
 1. Create a virtual environment:

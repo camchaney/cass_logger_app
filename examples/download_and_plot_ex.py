@@ -58,18 +58,17 @@ def download_data():
 
 
 def plot_internal_imu_data(data_dir: str):
-    """Plot fork and shock suspension travel against time.
+    """Plot internal IMU gyroscope data (gx, gy, gz) against time.
 
     NOTE: This is for the existing data in the examples/data dir.
 
-    Applies the ADC-to-millimetre gain constants to the raw potentiometer
-    channels and renders a two-panel time-series figure using matplotlib.
+    Reads all .bin files in the given directory and renders a three-panel
+    time-series figure of the gyroscope channels using matplotlib.
 
     Parameters
     ----------
-    example_data : pd.DataFrame
-        DataFrame returned by ``import_data``. Must contain columns
-        ``t``, ``a0``, and ``b0``.
+    data_dir : str
+        Path to the directory containing .bin data files.
     """
     for file in Path(data_dir).glob("*.bin"):
         example_data = cass_util.process_data_file(file)
@@ -100,8 +99,8 @@ def plot_internal_imu_data(data_dir: str):
 
 def test_delete():
     print(cass_util.list_files())
-    bSucess = cass_util.delete_all_files(prompt_user=True)
-    if bSucess:
+    bSuccess = cass_util.delete_all_files(prompt_user=True)
+    if bSuccess:
         print("Success!!!")
     print(cass_util.list_files())
 
