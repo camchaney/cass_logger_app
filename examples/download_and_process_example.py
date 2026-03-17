@@ -18,16 +18,23 @@ def import_data():
 
 def plot_data(example_data: pd.DataFrame):
     plt.style.use("ggplot")
-    fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True)
+
+    fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(12, 8))
+    for ax in axs:
+        ax.tick_params(axis="x", labelbottom=True)
     axs[0].plot(example_data["t"], example_data["a0"] * FORK_GAIN)
-    axs[0].set_title("Example data: Fork Pot")
     axs[1].plot(example_data["t"], example_data["b0"] * SHOCK_GAIN)
-    axs[1].set_title("Example data: Shock Pot")
-    plt.title("Example data plot (potentiometer data)")
+
+    # labeling / formatting
+    axs[0].set_title("[Example] Fork Pot")
+    axs[1].set_title("[Example] Shock Pot")
+    plt.title("Example data plot")
     axs[0].set_xlabel("time [s]")
     axs[0].set_ylabel("Travel [mm]")
     axs[1].set_xlabel("time [s]")
     axs[1].set_ylabel("Travel [mm]")
+
+    plt.tight_layout()
     plt.show()
 
 
