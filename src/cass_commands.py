@@ -10,8 +10,7 @@ Typical usage
 
 Notes
 -----
-- Requires two USB serial ports (data + command). Currently only tested on macOS/Linux.
-- TODO: Add Windows compatibility for get_serial_ports and _establish_serial.
+- Requires two USB serial ports (data + command). Main testing done on macOS/Linux, limited testing on Windows.
 """
 
 import os
@@ -27,23 +26,38 @@ import warnings
 from src.firmware_structs import FIRMWARE_DTYPES, COLUMN_ORDERS
 from typing import Optional, Union, Dict, List
 import re
+import platform
 
 
 class CassCommands:
-    """Interface for the Cass Logger device.
+    """
+    Interface for communicating with Cass data logger devices over serial.
 
     Manages dual serial connections (one for data, one for commands),
     file management on the device's SD card, device configuration
     (RTC, device ID, firmware version), and offline data processing.
-
-    Serial ports are opened lazily on first access via the `ser_data`
-    and `ser_command` properties.
+    
+    This class provides cross-platform support for Windows, macOS, and Linux.
+    
+    Windows Usage (less tested):
+        If auto-detection fails, you can manually specify ports:
+        1. Create instance: logger = CassCommands()
+        2. List ports: logger.list_available_ports()
+        3. Set ports manually: logger.set_manual_serial_ports('COM3', 'COM4')
+        4. Then use normally: logger.download_all()
+    
+    If you encounter issue on Windows, use the diagnose_windows_ports()
+    method to get detailed information about each COM port, which can help
+    identify the correct ports to use.
+    
+    Note: On Windows, make sure the device drivers are installed and the device
+    appears in Device Manager under "Ports (COM & LPT)".
     """
-
     def __init__(self):
         self._ser_data = None
         self._ser_command = None
         self.reset_buff_used = False
+        self._manual_ports = None           # For manual port specification
 
     # --- Properties ---
 
@@ -102,8 +116,8 @@ class CassCommands:
     # --- Public Instance Methods ---
 
     def get_serial_ports(self):
-        """Detect and return the two logger serial ports.
-
+        """Cross-platform method to find the two logger serial ports.
+        
         Returns
         -------
         list of str or None
@@ -111,13 +125,126 @@ class CassCommands:
             or None if exactly two USB modem ports are not found.
         """
         ports = serial.tools.list_ports.comports()
-        logger_ports = [port.device for port in ports if "usbmodem" in port.device]
+        logger_ports = []
+        
+        system = platform.system().lower()
+        
+        if system == "windows":
+            # look for COM ports with specific characteristics
+            for port in ports:
+                if port.vid is not None:  # USB device
+                    # add common USB-to-serial converter VIDs or device descriptions
+                    if (port.vid == 0x16C0 or
+                        "teensy" in port.description.lower() or
+                        "usb serial" in port.description.lower() or
+                        "ch340" in port.description.lower() or
+                        "cp210" in port.description.lower() or
+                        "ftdi" in port.description.lower()):
+                        logger_ports.append(port.device)
+        else:
+            # macOS/Linux
+            logger_ports = [port.device for port in ports if "usbmodem" in port.device]
+        
         if len(logger_ports) != 2:
-            print("No dual serial ports found!")
+            print(f"Expected 2 serial ports, found {len(logger_ports)}: {logger_ports}")
+            print("Available ports:")
+            for port in ports:
+                print(f"  {port.device}: {port.description}")
+                if hasattr(port, 'vid') and port.vid:
+                    print(f"    VID: 0x{port.vid:04X}, PID: 0x{port.pid:04X}")
+            
+            # Windows-specific troubleshooting tips
+            if system == "windows":
+                print("\nWindows troubleshooting:")
+                print("1. Ensure device drivers are installed")
+                print("2. Check Device Manager > Ports (COM & LPT)")
+                print("3. Use list_available_ports() and set_manual_serial_ports() if needed")
+                print("4. Make sure no other applications are using the COM ports")
+            
             return None
         else:
             return logger_ports
 
+    def set_manual_serial_ports(self, data_port: str, command_port: str):
+        """Manually specify the serial ports if auto-detection fails.
+        
+        Args:
+            data_port: Port name for data communication (e.g., 'COM3' on Windows, '/dev/ttyACM0' on Linux)
+            command_port: Port name for command communication (e.g., 'COM4' on Windows, '/dev/ttyACM1' on Linux)
+        """
+        try:
+            # Test that both ports can be opened
+            test_data = serial.Serial(data_port, 9600, timeout=1)
+            test_command = serial.Serial(command_port, 9600, timeout=1)
+            test_data.close()
+            test_command.close()
+            
+            # Store the ports for use by _establish_serial
+            self._manual_ports = [data_port, command_port]
+            print(f"Manual ports set: data={data_port}, command={command_port}")
+            return True
+        except serial.SerialException as e:
+            print(f"Error accessing ports: {e}")
+            return False
+
+    def list_available_ports(self):
+        """List all available serial ports for manual selection."""
+        ports = serial.tools.list_ports.comports()
+        print("Available serial ports:")
+        for i, port in enumerate(ports):
+            print(f"  [{i}] {port.device}: {port.description}")
+            if hasattr(port, 'vid') and port.vid:
+                print(f"      VID: 0x{port.vid:04X}, PID: 0x{port.pid:04X}")
+        return ports
+
+    def diagnose_windows_ports(self):
+        """Windows-specific diagnostic helper to identify potential logger ports."""
+        if platform.system().lower() != "windows":
+            print("This diagnostic is only for Windows systems.")
+            return
+            
+        ports = serial.tools.list_ports.comports()
+        print("=== Windows Serial Port Diagnostics ===")
+        print(f"Found {len(ports)} total ports:")
+        
+        teensy_candidates = []
+        usb_candidates = []
+        
+        for port in ports:
+            print(f"\nPort: {port.device}")
+            print(f"  Description: {port.description}")
+            print(f"  Manufacturer: {port.manufacturer}")
+            
+            if hasattr(port, 'vid') and port.vid:
+                print(f"  VID: 0x{port.vid:04X}")
+                print(f"  PID: 0x{port.pid:04X}")
+                
+                # Check for known Teensy identifiers
+                if port.vid == 0x16C0:  # VOTI (Van Ooijen Technische Informatica)
+                    teensy_candidates.append(port.device)
+                    print("  *** TEENSY DEVICE DETECTED ***")
+                elif port.vid == 0x239A:  # Adafruit
+                    teensy_candidates.append(port.device)
+                    print("  *** POSSIBLE TEENSY/MICROCONTROLLER ***")
+                elif "teensy" in port.description.lower():
+                    teensy_candidates.append(port.device)
+                    print("  *** TEENSY IN DESCRIPTION ***")
+                else:
+                    usb_candidates.append(port.device)
+            else:
+                print("  No USB VID/PID (might be built-in port)")
+        
+        print(f"\n=== Summary ===")
+        print(f"Teensy candidates: {teensy_candidates}")
+        print(f"Other USB devices: {usb_candidates}")
+        
+        if len(teensy_candidates) == 2:
+            print(f"\nTry: logger.set_manual_serial_ports('{teensy_candidates[0]}', '{teensy_candidates[1]}')")
+        elif len(teensy_candidates) > 0:
+            print(f"Found {len(teensy_candidates)} potential devices, but need exactly 2.")
+        else:
+            print("No obvious Teensy devices found. Check Device Manager.")
+            
     def set_RTC_time(self):
         """Set the device RTC to the current UTC time.
 
@@ -130,7 +257,8 @@ class CassCommands:
         print("Current time: ", current_time)
         time_string = current_time.strftime("%Y-%m-%d %H:%M:%S")
         print("Time string: ", time_string)
-        time_string += "x"  # term char
+        # Add termination character
+        time_string += "x"
 
         self.ser_command.write(b"e")
         self.ser_data.write(time_string.encode("utf-8"))
@@ -181,7 +309,7 @@ class CassCommands:
         self._open_serial()
         self._flush_all()
 
-        self.ser_command.write(b"l")
+        self.ser_command.write(b"l")  # list files
 
         result = b""
         while b"xxx" not in result:
@@ -189,6 +317,7 @@ class CassCommands:
                 result += self.ser_data.read(self.ser_data.in_waiting)
         result = result.decode("utf-8")
 
+        # self._close_serial()
         return result.splitlines()[:-1]
 
     def list_file_sizes(self):
@@ -202,15 +331,18 @@ class CassCommands:
         self._open_serial()
         self._flush_all()
 
-        files = self.list_files()
+        files = self.list_files()  # list files
         num_files = len(files)
 
-        self.ser_command.write(b"z")
+        self.ser_command.write(b"z")  # list file sizes
 
+        my_file_sizes = []
         my_file_sizes = [
             int(self.ser_data.read_until(b"\n").decode("utf-8").strip(), 2)
             for i in range(num_files)
         ]
+
+        # self._close_serial()
 
         return my_file_sizes
 
@@ -266,6 +398,8 @@ class CassCommands:
 
         sd_buff_size = 5120
         num_buffs = file_size / sd_buff_size
+        fractional_buffs = num_buffs - int(num_buffs)
+        # TODO: add fractional buffer transfer at end
         if file_size % sd_buff_size != 0:
             num_buffs = file_size // sd_buff_size  # skip last incomplete sd_buffer
         num_buffs = int(num_buffs)
@@ -274,33 +408,42 @@ class CassCommands:
         self.ser_command.write(b"o")  # open target file
         self.ser_data.write(filename_term)
 
-        sd_buff = bytes()
-        sd_byte_idx = 0
+        sd_buff = bytes()  # empty byte array for current buffer
+        sd_byte_idx = 0  # byte index in current buffer
         retry_loop = False
-        i = 0
+        i = 0  # current buffer index
         while i < num_buffs:
-            self.ser_command.write(b"t")  # request next buffer from device
-            self.ser_command.flush()
+            # read each buffer
+            self.ser_command.write(b"t")  # send command for Teensy to send buffer
+            self.ser_command.flush()  # wait until command is sent
             time_in_buffer = time.monotonic()
 
             sd_byte_idx = 0
             retry_loop = False
             while sd_byte_idx < sd_buff_size:
-                num_read = min(
-                    int(self.ser_data.in_waiting),
-                    sd_buff_size - sd_byte_idx,
+                # read each byte in buffer
+                num_read = min(  # number of bytes to read
+                    int(self.ser_data.in_waiting),  # number of bytes in serial buffer
+                    sd_buff_size - sd_byte_idx,  # number of bytes remaining in buffer
                 )
                 if num_read > 0:
-                    bytesIn = self.ser_data.read(num_read)
+                    bytesIn = self.ser_data.read(num_read)  # incoming buffer
                     sd_byte_idx += num_read
                     sd_buff += bytesIn
                     time_in_buffer = time.monotonic()
                 elif num_read == 0 and (time.monotonic() - time_in_buffer > 0.1):
-                    self.ser_data.reset_input_buffer()
+                    # NOTE: why does this condition represent a data corruption?
+                    # reset the position in the file to (curr_position - sd_byte_idx)
+                    # while (self.ser_data.in_waiting) > 0:
+                    #     self.ser_data.read(self.ser_data.in_waiting)  # clear serial buffer
+                    #     print("Clearing serial buffer...")              # doesn't seem to be doing anything
+                    self.ser_data.reset_input_buffer()  # clear serial buffer before initiating reset
+                    # self.ser_data.reset_output_buffer()
                     buff_success = self._reset_buff((i) * sd_buff_size, filename)
                     sd_buff = []
                     retry_loop = True
                     self.reset_buff_used = True
+
                     break
 
             if retry_loop:
@@ -311,6 +454,7 @@ class CassCommands:
             sd_buff = bytes()
             sd_byte_idx = 0
 
+        # DEBUG
         expected_byte_number = num_buffs * sd_buff_size
         number_buffs_off = expected_byte_number - len(bytes_received)
         print(f"Number of bytes short = {number_buffs_off} ({filename})")
@@ -371,6 +515,7 @@ class CassCommands:
         ]
 
         self._flush_all()
+        # write metadata
         fw_ver = self.get_fw_ver()
         device_id = self.get_device_ID()
         md_path = Path(dir_name, "metadata.txt")
@@ -393,7 +538,7 @@ class CassCommands:
         bool
             True if the device echoed back the correct ID, False otherwise.
         """
-        self.ser_command.write(b"p")
+        self.ser_command.write(b"p")    # eeprom put
         device_ID_orig = device_ID
         device_ID += "x"
         print("device_ID to write = ", device_ID)
@@ -405,7 +550,7 @@ class CassCommands:
         print("Device ID is: ", check_device_ID)
 
         self._close_serial()
-        if check_device_ID == device_ID_orig:
+        if check_device_ID == device_ID_orig:  # TODO: error handling
             return True
         else:
             return False
@@ -446,10 +591,10 @@ class CassCommands:
         """
         if unix_install is None:
             unix_install = int(time.time())
-        self.ser_command.write(b"j")
+        self.ser_command.write(b"j")  # eeprom put UNIX timestamp
 
-        unix_install_orig = str(unix_install)
-        unix_install = unix_install_orig + "x"
+        unix_install_orig = str(unix_install)  # keep original as string
+        unix_install = unix_install_orig + "x"  # add terminator
 
         print("unix_RTC_batt install time to write = ", unix_install)
         self.ser_data.write(unix_install.encode("utf-8"))
@@ -514,7 +659,7 @@ class CassCommands:
         self._close_serial()
         return fw_ver[:-1]
 
-    # --- Static and Class Methods ---
+    # --- Static and Class Methods
 
     @classmethod
     def process_data_file(cls, full_filename: Union[str, Path], fw_ver="std"):
@@ -611,6 +756,7 @@ class CassCommands:
             try:
                 parsed.append(CassCommands._parse_metadata_file(str(f)))
             except Exception as exc:
+                # skip files that fail to read/parse; optionally log the error
                 parsed.append({"error": f"failed to parse {f}: {exc}"})
 
         if first_only:
@@ -693,13 +839,46 @@ class CassCommands:
         RuntimeError
             If neither port returns the expected handshake response.
         """
-        serial_ports = self.get_serial_ports()
+        # Use manual ports if set, otherwise auto-detect
+        if self._manual_ports:
+            serial_ports = self._manual_ports
+            print(f"Using manual ports: {serial_ports}")
+        else:
+            serial_ports = self.get_serial_ports()
+            
         if serial_ports is None:
             raise ValueError(
-                "No logger detected, makes sure it's plugged in and powered on!"
+                "No logger detected! Make sure it's plugged in and powered on. "
+                "On Windows, you may need to use set_manual_serial_ports() or list_available_ports() "
+                "to manually specify the correct COM ports."
             )
-        ser_data = serial.Serial(serial_ports[0], baud_rate)
-        ser_command = serial.Serial(serial_ports[1], baud_rate)
+        
+        # Create serial connections with platform-appropriate settings
+        try:
+            # On Windows, sometimes need to set additional parameters for stability
+            if platform.system().lower() == "windows":
+                ser_data = serial.Serial(
+                    serial_ports[0], 
+                    baud_rate, 
+                    timeout=1,
+                    write_timeout=1,
+                    rtscts=False,
+                    dsrdtr=False
+                )
+                ser_command = serial.Serial(
+                    serial_ports[1], 
+                    baud_rate, 
+                    timeout=1,
+                    write_timeout=1,
+                    rtscts=False, 
+                    dsrdtr=False
+                )
+            else:
+                ser_data = serial.Serial(serial_ports[0], baud_rate)
+                ser_command = serial.Serial(serial_ports[1], baud_rate)
+        except serial.SerialException as e:
+            raise ValueError(f"Failed to open serial ports {serial_ports}: {e}")
+            
         if not ser_data.is_open:
             ser_data.open()
         if not ser_command.is_open:
@@ -747,43 +926,27 @@ class CassCommands:
         ser_obj.flush()
 
     def _flush_all(self):
-        """Flush both the data and command serial ports."""
         self._flush_ser_port(self.ser_data)
         self._flush_ser_port(self.ser_command)
 
     def _reset_buff(self, reset_pos, filename):
-        """Send a buffer-reset command to recover a stalled file transfer.
-
-        Tells the device to seek back to reset_pos in the open file and
-        resume transmission from that byte offset. Uses binary start/end
-        markers to frame the position value.
-
-        Parameters
-        ----------
-        reset_pos : int
-            Byte offset in the file to reset to.
-        filename : str
-            Name of the file being transferred (used for logging only).
-
-        Returns
-        -------
-        bool
-            Always True after the reset sequence completes.
-        """
         START_MARKER = b"\xff\xfe\xfd"
         END_MARKER = b"\xfd\xfe\xff"
 
         print(f"IN RESET BUFF, file: {filename} at pos: {reset_pos}")
 
-        self.ser_command.write(b"n")
-        self._flush_ser_port(self.ser_command)
+        self.ser_command.write(b"n")  # send reset buffer command
+        self._flush_ser_port(self.ser_command)  # wait until command is sent
+        # self.ser_command.flush()
 
-        time.sleep(0.05)
+        time.sleep(0.05)  # NOTE: not sure if needed
 
         reset_pos = START_MARKER + str(reset_pos).encode("utf-8") + END_MARKER
-        self.ser_data.write(reset_pos)
-        self._flush_ser_port(self.ser_data)
+        self.ser_data.write(reset_pos)  # send reset idx
+        self._flush_ser_port(self.ser_data)  # wait until idx is sent
+        # self.ser_data.flush()
 
+        # Validate that the correct position was set
         self.ser_data.read_until(START_MARKER)
         return_position = self.ser_data.read_until(END_MARKER)
         return_position = return_position[: -len(END_MARKER)]
@@ -793,6 +956,8 @@ class CassCommands:
             print("Error decoding return position from device.")
         print(return_position)
 
+        # Make sure there isn't any leftover data in the serial buffers
+        # self.ser_data.reset_input_buffer()
         while self.ser_data.in_waiting > 0:
             self.ser_data.read(self.ser_data.in_waiting)
             print("Clearing serial buffer after...")
@@ -813,13 +978,14 @@ class CassCommands:
             True if the device confirmed deletion, False otherwise.
         """
         self.ser_command.reset_input_buffer()  # TODO: should this be a normal flush?
-        self.ser_command.write(b"x")
+        self.ser_command.write(b"x")  # delete file
 
-        filename = bytes(filename, "utf-8")
-        self.ser_command.write(filename)
+        filename_term = filename + "x"  # append terminator so firmware knows filename is complete
+        self.ser_command.write(bytes(filename_term, "utf-8"))
+        self.ser_command.flush()  # ensure bytes are transmitted before reading response
 
-        b_success = self.ser_data.read_until(b"x")
-        b_success = int(b_success.decode("ascii").strip("x"))
+        b_success = self.ser_data.read_until(b"x")  # check for success
+        b_success = int(b_success.decode("ascii").strip().strip("x"))
         if b_success:
             return True
         else:
@@ -882,6 +1048,7 @@ class CassCommands:
                     if p.is_file() and p.name.lower() == name_lower:
                         matches.append(p)
         except PermissionError:
+            # optionally handle permission errors (skip folders you can't access)
             pass
 
         return matches
@@ -911,6 +1078,7 @@ class CassCommands:
             if s is None:
                 return None
             s = s.strip()
+            # remove surrounding quotes if any
             if (s.startswith('"') and s.endswith('"')) or (
                 s.startswith("'") and s.endswith("'")
             ):
