@@ -38,12 +38,23 @@ from src.cass_commands import CassCommands
 cass_utils = CassCommands()
 ```
 
+### Serial Port Management
+
+| Operation | Method | Description |
+|-----------|--------|-------------|
+| Auto-detect ports | `cass_utils.get_serial_ports()` | Find the two logger serial ports automatically |
+| Manual port setup | `cass_utils.set_manual_serial_ports(data, cmd)` | Manually specify ports if auto-detection fails |
+| List available ports | `cass_utils.list_available_ports()` | Show all available serial ports for manual selection |
+| Windows diagnostics | `cass_utils.diagnose_windows_ports()` | Windows-specific tool to identify potential logger ports |
+
 ### File Management
 
 | Operation | Method | Description |
 |-----------|--------|-------------|
 | List files | `cass_utils.list_files()` | Returns filenames stored on the device SD card |
 | List file sizes | `cass_utils.list_file_sizes()` | Returns file sizes in bytes, in the same order as `list_files()` |
+| Read single file | `cass_utils.read_file(filename, file_size)` | Download a single file from the device as raw bytes |
+| Write bytes to file | `cass_utils.bytes_to_file(bytes, filename, dir)` | Write raw bytes to a local file, creating the directory if needed |
 | Download all | `cass_utils.download_all()` | Downloads all files to a timestamped local directory and writes a `metadata.txt` |
 | Delete all | `cass_utils.delete_all_files()` | Deletes all files from the SD card (pass `prompt_user=True` to confirm first) |
 
@@ -53,6 +64,7 @@ cass_utils = CassCommands()
 |-----------|--------|-------------|
 | Parse binary file | `CassCommands.process_data_file(path)` | Parses a `.bin` file into a pandas DataFrame with a `t` (seconds) column. Pass `fw_ver` if using an I2C firmware variant |
 | Parse FIT file | `CassCommands.process_fit_file(dir, filename)` | Parses a `.fit` file into `(df_session, df_record)` DataFrames |
+| Handle timestamp rollover | `CassCommands.handle_tmicros_rollover(col)` | Reconstructs a monotonic timestamp column from a rolled-over microsecond counter |
 | Find metadata | `CassCommands.find_and_parse_metadata(dir)` | Searches a directory for `metadata.txt` and returns firmware version and device ID |
 
 ### Device Configuration
