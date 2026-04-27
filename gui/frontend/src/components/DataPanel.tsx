@@ -12,8 +12,6 @@ import type { BinParseResult, FitParseResult } from '../types'
 
 type SubTab = 'bin' | 'fit' | 'metadata'
 
-const FW_VERS = ['std', 'i2c_1', 'i2c_2']
-
 const CHART_COLORS = ['#3b82f6', '#22c55e', '#ef4444', '#f59e0b', '#8b5cf6']
 
 // IMU groups — all possible across firmware variants; filtered to what's in the data at render time
@@ -41,6 +39,7 @@ export default function DataPanel() {
 	// ── .bin state ─────────────────────────────────────────────────────────────
 	const [binPath, setBinPath] = useState<string | null>(null)
 	const [fwVer, setFwVer] = useState('std')
+	const [fwVerSource, setFwVerSource] = useState<'metadata' | 'default' | null>(null)
 	const [binResult, setBinResult] = useState<BinParseResult | null>(null)
 	const [binError, setBinError] = useState<string | null>(null)
 	const [binLoading, setBinLoading] = useState(false)
@@ -65,7 +64,23 @@ export default function DataPanel() {
 	const pickBin = async () => {
 		if (!api) return
 		const res = await api.pick_file(['Binary files (*.bin)', 'All files (*.*)'])
-		if (res.ok && res.data) setBinPath(res.data)
+		if (!res.ok || !res.data) return
+		const path = res.data
+		setBinPath(path)
+		setBinResult(null)
+		setBinError(null)
+
+		// Extract directory (handles both / and \ separators)
+		const sep = path.includes('\\') ? '\\' : '/'
+		const dir = path.substring(0, path.lastIndexOf(sep))
+		const metaRes = await api.find_metadata(dir)
+		if (metaRes.ok && metaRes.data?.firmware_version) {
+			setFwVer(metaRes.data.firmware_version as string)
+			setFwVerSource('metadata')
+		} else {
+			setFwVer('std')
+			setFwVerSource('default')
+		}
 	}
 
 	const parseBin = async () => {
@@ -182,25 +197,29 @@ export default function DataPanel() {
 						<div className="card-title">Load Binary File</div>
 						<div className="row" style={{ marginBottom: 12 }}>
 							<button className="btn btn-secondary" onClick={pickBin}>Choose .bin file</button>
-							{binPath && <span className="mono muted">{binPath.split('/').pop()}</span>}
+							{binPath && <span className="mono muted">{binPath.split(/[\\/]/).pop()}</span>}
 						</div>
-						<div className="field-row" style={{ marginBottom: 12 }}>
-							<div className="field">
-								<label>Firmware version</label>
-								<select value={fwVer} onChange={(e) => setFwVer(e.target.value)}>
-									{FW_VERS.map((v) => <option key={v} value={v}>{v}</option>)}
-								</select>
+
+						{fwVerSource === 'default' && (
+							<div className="alert alert-warning" style={{ marginBottom: 12 }}>
+								No metadata file found. This should always be in the same directory as your .bin files. Defaulting to <strong>std</strong> firmware.
 							</div>
-							<button
-								className="btn btn-primary"
-								onClick={parseBin}
-								disabled={!binPath || binLoading}
-							>
-								{binLoading ? <span className="spinner" /> : null}
-								{binLoading ? ' Parsing…' : ' Parse'}
-							</button>
-						</div>
-						{binError && <div className="alert alert-error">{binError}</div>}
+						)}
+						{fwVerSource === 'metadata' && (
+							<div className="alert alert-info" style={{ marginBottom: 12 }}>
+								Firmware version detected from metadata: <strong className="mono">{fwVer}</strong>
+							</div>
+						)}
+
+						<button
+							className="btn btn-primary"
+							onClick={parseBin}
+							disabled={!binPath || binLoading}
+						>
+							{binLoading ? <span className="spinner" /> : null}
+							{binLoading ? ' Parsing…' : ' Parse'}
+						</button>
+						{binError && <div className="alert alert-error" style={{ marginTop: 8 }}>{binError}</div>}
 					</div>
 
 					{binResult && (
