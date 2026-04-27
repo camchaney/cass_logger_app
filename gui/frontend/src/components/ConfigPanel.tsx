@@ -28,7 +28,7 @@ export default function ConfigPanel({ connected, onRefresh }: Props) {
 	const [devIdInput, setDevIdInput] = useState('')
 
 	const rtcTs = useMsg()
-	const [rtcTsVal, setRtcTsVal] = useState<string | null>(null)
+	const [rtcTsUnix, setRtcTsUnix] = useState<number | null>(null)
 
 	const fw = useMsg()
 	const [fwVal, setFwVal] = useState<string | null>(null)
@@ -109,27 +109,29 @@ export default function ConfigPanel({ connected, onRefresh }: Props) {
 
 	// ── RTC install timestamp ─────────────────────────────────────────────────
 
+	const TEN_MONTHS_SEC = 10 * 30 * 24 * 60 * 60
+
 	const getRtcTs = async () => {
 		if (!api) return
 		rtcTs.clear()
 		const res = await api.get_rtc_install_timestamp()
-		if (res.ok) {
-			const ts = res.data
-			if (ts) {
-				const dt = new Date(parseInt(ts) * 1000)
-				setRtcTsVal(`${ts} (${dt.toUTCString()})`)
-			}
+		if (res.ok && res.data) {
+			setRtcTsUnix(parseInt(res.data, 10))
 		} else {
 			rtcTs.set(false, res.error ?? 'Failed')
 		}
 	}
 
-	const putRtcTs = async (useNow: boolean) => {
+	const putRtcTs = async () => {
 		if (!api) return
 		rtcTs.clear()
-		const res = await api.put_rtc_install_timestamp(useNow ? undefined : undefined)
-		if (res.ok) rtcTs.set(true, res.data ?? 'Saved')
-		else rtcTs.set(false, res.error ?? 'Failed')
+		const res = await api.put_rtc_install_timestamp()
+		if (res.ok) {
+			rtcTs.set(true, res.data ?? 'Saved')
+			setRtcTsUnix(Math.floor(Date.now() / 1000))
+		} else {
+			rtcTs.set(false, res.error ?? 'Failed')
+		}
 	}
 
 	// ── Firmware version ──────────────────────────────────────────────────────
@@ -185,6 +187,43 @@ export default function ConfigPanel({ connected, onRefresh }: Props) {
 						{rtc.msg.text}
 					</div>
 				)}
+
+				{/* Battery install timestamp — grouped under RTC */}
+				<div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+					<div className="card-title">RTC Battery Install</div>
+					<div className="row" style={{ marginBottom: 8 }}>
+						<button className="btn btn-secondary" onClick={getRtcTs}>Read</button>
+						<button className="btn btn-primary" onClick={putRtcTs}>Set to Now</button>
+					</div>
+
+					{rtcTsUnix !== null && (() => {
+						const ageSeconds = Math.floor(Date.now() / 1000) - rtcTsUnix
+						const ageMonths = ageSeconds / (30 * 24 * 60 * 60)
+						const dt = new Date(rtcTsUnix * 1000).toUTCString()
+						return (
+							<>
+								<div className="alert alert-info" style={{ marginBottom: 8 }}>
+									<span className="muted" style={{ fontSize: 12 }}>Installed </span>
+									<strong className="mono">{dt}</strong>
+									<span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
+										({ageMonths.toFixed(1)} months ago)
+									</span>
+								</div>
+								{ageSeconds > TEN_MONTHS_SEC && (
+									<div className="alert alert-warning">
+										⚠ Battery is <strong>{ageMonths.toFixed(1)} months old</strong> — consider replacing it soon to avoid RTC data loss.
+									</div>
+								)}
+							</>
+						)
+					})()}
+
+					{rtcTs.msg && (
+						<div className={`alert ${rtcTs.msg.ok ? 'alert-success' : 'alert-error'}`}>
+							{rtcTs.msg.text}
+						</div>
+					)}
+				</div>
 			</div>
 
 			{/* Device ID */}
@@ -215,25 +254,6 @@ export default function ConfigPanel({ connected, onRefresh }: Props) {
 				{devId.msg && (
 					<div className={`alert ${devId.msg.ok ? 'alert-success' : 'alert-error'}`}>
 						{devId.msg.text}
-					</div>
-				)}
-			</div>
-
-			{/* RTC install timestamp */}
-			<div className="card">
-				<div className="card-title">RTC Battery Install Timestamp</div>
-				<div className="row" style={{ marginBottom: 10 }}>
-					<button className="btn btn-secondary" onClick={getRtcTs}>Read</button>
-					<button className="btn btn-primary" onClick={() => putRtcTs(true)}>Set to Now</button>
-				</div>
-				{rtcTsVal && (
-					<div className="alert alert-info" style={{ marginBottom: 8 }}>
-						<span className="mono">{rtcTsVal}</span>
-					</div>
-				)}
-				{rtcTs.msg && (
-					<div className={`alert ${rtcTs.msg.ok ? 'alert-success' : 'alert-error'}`}>
-						{rtcTs.msg.text}
 					</div>
 				)}
 			</div>
