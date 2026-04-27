@@ -121,7 +121,7 @@ export default function FilesPanel({ connected }: Props) {
 			{/* File list */}
 			<div className="card">
 				<div className="row" style={{ marginBottom: 12 }}>
-					<span className="card-title" style={{ margin: 0 }}>SD Card Files</span>
+					<span className="card-title" style={{ margin: 0 }}>Logger Files</span>
 					<span className="spacer" />
 					<button className="btn btn-secondary" onClick={loadFiles} disabled={loadingFiles}>
 						{loadingFiles ? <span className="spinner spinner-dark" /> : '↺'} Refresh
