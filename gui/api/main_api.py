@@ -250,6 +250,8 @@ class MainApi:
 		df = df_map.get(source)
 		if df is None:
 			return err("No data to export — parse a file first.")
+		if not dest_path.lower().endswith(".csv"):
+			dest_path += ".csv"
 		try:
 			df.to_csv(dest_path, index=False)
 			return ok(f"Exported {len(df)} rows to {dest_path}")
