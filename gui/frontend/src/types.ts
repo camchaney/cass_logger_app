@@ -36,8 +36,7 @@ export interface BinParseResult {
 	columns: string[]
 	rows: number
 	preview: Record<string, number>[]
-	susp_data: Record<string, number>[]
-	imu_data: Record<string, number>[]
+	chart_data: Record<string, number>[]
 }
 
 export interface FitParseResult {

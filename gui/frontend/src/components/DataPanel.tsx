@@ -14,6 +14,26 @@ type SubTab = 'bin' | 'fit' | 'metadata'
 
 const FW_VERS = ['std', 'i2c_1', 'i2c_2']
 
+const CHART_COLORS = ['#3b82f6', '#22c55e', '#ef4444', '#f59e0b', '#8b5cf6']
+
+// IMU groups — all possible across firmware variants; filtered to what's in the data at render time
+const IMU_GROUPS = [
+	{ key: 'g',        label: 'G',         cols: ['gx',       'gy',       'gz'      ] },
+	{ key: 'w',        label: 'W',         cols: ['wx',       'wy',       'wz'      ] },
+	{ key: 't',        label: 'T',         cols: ['Tx',       'Ty',       'Tz'      ] },
+	{ key: 'g_i2c',   label: 'G (i2c)',   cols: ['gx_i2c',   'gy_i2c',   'gz_i2c'  ] },
+	{ key: 'w_i2c',   label: 'W (i2c)',   cols: ['wx_i2c',   'wy_i2c',   'wz_i2c'  ] },
+	{ key: 't_i2c',   label: 'T (i2c)',   cols: ['Tx_i2c',   'Ty_i2c',   'Tz_i2c'  ] },
+	{ key: 'g_i2c_c', label: 'G (i2c·c)', cols: ['gx_i2c_c', 'gy_i2c_c', 'gz_i2c_c'] },
+	{ key: 'w_i2c_c', label: 'W (i2c·c)', cols: ['wx_i2c_c', 'wy_i2c_c', 'wz_i2c_c'] },
+	{ key: 't_i2c_c', label: 'T (i2c·c)', cols: ['Tx_i2c_c', 'Ty_i2c_c', 'Tz_i2c_c'] },
+	{ key: 'g_i2c_e', label: 'G (i2c·e)', cols: ['gx_i2c_e', 'gy_i2c_e', 'gz_i2c_e'] },
+	{ key: 'w_i2c_e', label: 'W (i2c·e)', cols: ['wx_i2c_e', 'wy_i2c_e', 'wz_i2c_e'] },
+	{ key: 't_i2c_e', label: 'T (i2c·e)', cols: ['Tx_i2c_e', 'Ty_i2c_e', 'Tz_i2c_e'] },
+]
+
+const CHANNEL_LETTERS = ['a', 'b', 'c', 'd', 'e', 'f']
+
 export default function DataPanel() {
 	const api = window.pywebview?.api
 	const [subTab, setSubTab] = useState<SubTab>('bin')
@@ -21,12 +41,11 @@ export default function DataPanel() {
 	// ── .bin state ─────────────────────────────────────────────────────────────
 	const [binPath, setBinPath] = useState<string | null>(null)
 	const [fwVer, setFwVer] = useState('std')
-	const [gainFork, setGainFork] = useState(1)
-	const [gainShock, setGainShock] = useState(1)
 	const [binResult, setBinResult] = useState<BinParseResult | null>(null)
 	const [binError, setBinError] = useState<string | null>(null)
 	const [binLoading, setBinLoading] = useState(false)
-	const [binPlot, setBinPlot] = useState<'susp' | 'imu'>('susp')
+	const [imuGroupKey, setImuGroupKey] = useState('g')
+	const [channelLetter, setChannelLetter] = useState('a')
 
 	// ── .fit state ─────────────────────────────────────────────────────────────
 	const [fitPath, setFitPath] = useState<string | null>(null)
@@ -54,8 +73,17 @@ export default function DataPanel() {
 		setBinError(null)
 		setBinResult(null)
 		const res = await api.parse_bin(binPath, fwVer)
-		if (res.ok && res.data) setBinResult(res.data)
-		else setBinError(res.error ?? 'Parse failed')
+		if (res.ok && res.data) {
+			setBinResult(res.data)
+			// Default selections to first available group/letter in this file
+			const cols = res.data.columns
+			const firstImu = IMU_GROUPS.find(g => g.cols.some(c => cols.includes(c)))
+			if (firstImu) setImuGroupKey(firstImu.key)
+			const firstCh = CHANNEL_LETTERS.find(l => [`${l}0`, `${l}1`, `${l}2`].some(c => cols.includes(c)))
+			if (firstCh) setChannelLetter(firstCh)
+		} else {
+			setBinError(res.error ?? 'Parse failed')
+		}
 		setBinLoading(false)
 	}
 
@@ -111,13 +139,26 @@ export default function DataPanel() {
 		else setMetaError(res.error ?? 'Not found')
 	}
 
-	// ── Chart data with gain applied ───────────────────────────────────────────
+	// ── Derived chart state (computed each render from binResult.columns) ────────
 
-	const suspData = binResult?.susp_data.map((row) => ({
-		...row,
-		a0: typeof row.a0 === 'number' ? row.a0 * gainFork : row.a0,
-		b0: typeof row.b0 === 'number' ? row.b0 * gainShock : row.b0,
-	}))
+	const availableImuGroups = binResult
+		? IMU_GROUPS.filter(g => g.cols.some(c => binResult.columns.includes(c)))
+		: []
+
+	const availableChannelLetters = binResult
+		? CHANNEL_LETTERS.filter(l => [`${l}0`, `${l}1`, `${l}2`].some(c => binResult.columns.includes(c)))
+		: []
+
+	const activeImuGroup =
+		availableImuGroups.find(g => g.key === imuGroupKey) ?? availableImuGroups[0]
+
+	const activeImuCols = activeImuGroup
+		? activeImuGroup.cols.filter(c => binResult!.columns.includes(c))
+		: []
+
+	const activeChannelCols = binResult
+		? [`${channelLetter}0`, `${channelLetter}1`, `${channelLetter}2`].filter(c => binResult.columns.includes(c))
+		: []
 
 	// ── Render ─────────────────────────────────────────────────────────────────
 
@@ -167,6 +208,7 @@ export default function DataPanel() {
 
 					{binResult && (
 						<>
+							{/* Preview table */}
 							<div className="card">
 								<div className="row" style={{ marginBottom: 12 }}>
 									<span className="card-title" style={{ margin: 0 }}>
@@ -195,74 +237,47 @@ export default function DataPanel() {
 								</div>
 							</div>
 
-							{/* Charts */}
-							<div className="card">
-								<div className="row" style={{ marginBottom: 12 }}>
-									<span className="card-title" style={{ margin: 0 }}>Charts</span>
-									<div className="tabs" style={{ margin: 0, borderBottom: 'none' }}>
-										<button className={`tab${binPlot === 'susp' ? ' active' : ''}`} onClick={() => setBinPlot('susp')}>Suspension</button>
-										<button className={`tab${binPlot === 'imu' ? ' active' : ''}`} onClick={() => setBinPlot('imu')}>IMU</button>
+							{/* IMU chart */}
+							{availableImuGroups.length > 0 && (
+								<div className="card">
+									<div className="row" style={{ marginBottom: 10 }}>
+										<span className="card-title" style={{ margin: 0 }}>IMU</span>
+										<div className="tabs" style={{ margin: 0, borderBottom: 'none' }}>
+											{availableImuGroups.map(g => (
+												<button
+													key={g.key}
+													className={`tab${imuGroupKey === g.key ? ' active' : ''}`}
+													onClick={() => setImuGroupKey(g.key)}
+												>
+													{g.label}
+												</button>
+											))}
+										</div>
 									</div>
+									<StackedCharts data={binResult.chart_data} cols={activeImuCols} />
 								</div>
+							)}
 
-								{binPlot === 'susp' && (
-									<>
-										<div className="row" style={{ marginBottom: 12, gap: 16 }}>
-											<div className="field" style={{ margin: 0, flex: '0 1 140px' }}>
-												<label>Fork gain (a0)</label>
-												<input type="number" value={gainFork} step="0.1" onChange={(e) => setGainFork(parseFloat(e.target.value) || 1)} />
-											</div>
-											<div className="field" style={{ margin: 0, flex: '0 1 140px' }}>
-												<label>Shock gain (b0)</label>
-												<input type="number" value={gainShock} step="0.1" onChange={(e) => setGainShock(parseFloat(e.target.value) || 1)} />
-											</div>
+							{/* Channel chart */}
+							{availableChannelLetters.length > 0 && (
+								<div className="card">
+									<div className="row" style={{ marginBottom: 10 }}>
+										<span className="card-title" style={{ margin: 0 }}>Channels</span>
+										<div className="tabs" style={{ margin: 0, borderBottom: 'none' }}>
+											{availableChannelLetters.map(l => (
+												<button
+													key={l}
+													className={`tab${channelLetter === l ? ' active' : ''}`}
+													onClick={() => setChannelLetter(l)}
+												>
+													{l.toUpperCase()}
+												</button>
+											))}
 										</div>
-										<div style={{ marginBottom: 16 }}>
-											<div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>Fork (a0)</div>
-											<ResponsiveContainer width="100%" height={160}>
-												<LineChart data={suspData}>
-													<CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-													<XAxis dataKey="t" type="number" domain={['auto', 'auto']} tick={{ fontSize: 10 }} label={{ value: 't (s)', position: 'insideBottomRight', offset: -4, fontSize: 10 }} />
-													<YAxis tick={{ fontSize: 10 }} />
-													<Tooltip contentStyle={{ fontSize: 12 }} />
-													<Line type="monotone" dataKey="a0" dot={false} stroke="#3b82f6" strokeWidth={1.5} />
-												</LineChart>
-											</ResponsiveContainer>
-										</div>
-										<div>
-											<div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>Shock (b0)</div>
-											<ResponsiveContainer width="100%" height={160}>
-												<LineChart data={suspData}>
-													<CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-													<XAxis dataKey="t" type="number" domain={['auto', 'auto']} tick={{ fontSize: 10 }} label={{ value: 't (s)', position: 'insideBottomRight', offset: -4, fontSize: 10 }} />
-													<YAxis tick={{ fontSize: 10 }} />
-													<Tooltip contentStyle={{ fontSize: 12 }} />
-													<Line type="monotone" dataKey="b0" dot={false} stroke="#f59e0b" strokeWidth={1.5} />
-												</LineChart>
-											</ResponsiveContainer>
-										</div>
-									</>
-								)}
-
-								{binPlot === 'imu' && (
-									<>
-										{(['gx', 'gy', 'gz'] as const).map((axis, idx) => (
-											<div key={axis} style={{ marginBottom: idx < 2 ? 16 : 0 }}>
-												<div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{axis}</div>
-												<ResponsiveContainer width="100%" height={140}>
-													<LineChart data={binResult.imu_data}>
-														<CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-														<XAxis dataKey="t" type="number" domain={['auto', 'auto']} tick={{ fontSize: 10 }} label={{ value: 't (s)', position: 'insideBottomRight', offset: -4, fontSize: 10 }} />
-														<YAxis tick={{ fontSize: 10 }} />
-														<Tooltip contentStyle={{ fontSize: 12 }} />
-														<Line type="monotone" dataKey={axis} dot={false} stroke={['#3b82f6', '#22c55e', '#ef4444'][idx]} strokeWidth={1.5} />
-													</LineChart>
-												</ResponsiveContainer>
-											</div>
-										))}
-									</>
-								)}
-							</div>
+									</div>
+									<StackedCharts data={binResult.chart_data} cols={activeChannelCols} />
+								</div>
+							)}
 						</>
 					)}
 				</>
@@ -294,14 +309,12 @@ export default function DataPanel() {
 									Record ({fitResult.record_rows.toLocaleString()} rows)
 								</button>
 							</div>
-
 							<div className="row" style={{ marginBottom: 8 }}>
 								<span className="spacer" />
 								<button className="btn btn-ghost" onClick={() => exportFit(fitTab === 'session' ? 'fit_session' : 'fit_record')}>
 									⬇ Export CSV
 								</button>
 							</div>
-
 							{fitTab === 'session' && <FitTable cols={fitResult.session_columns} rows={fitResult.session} />}
 							{fitTab === 'record' && (
 								<>
@@ -348,6 +361,45 @@ export default function DataPanel() {
 				</div>
 			)}
 		</div>
+	)
+}
+
+function StackedCharts({
+	data,
+	cols,
+}: {
+	data: Record<string, number>[]
+	cols: string[]
+}) {
+	return (
+		<>
+			{cols.map((col, idx) => (
+				<div key={col} style={{ marginBottom: idx < cols.length - 1 ? 16 : 0 }}>
+					<div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{col}</div>
+					<ResponsiveContainer width="100%" height={140}>
+						<LineChart data={data}>
+							<CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+							<XAxis
+								dataKey="t"
+								type="number"
+								domain={['auto', 'auto']}
+								tick={{ fontSize: 10 }}
+								label={{ value: 't (s)', position: 'insideBottomRight', offset: -4, fontSize: 10 }}
+							/>
+							<YAxis tick={{ fontSize: 10 }} />
+							<Tooltip contentStyle={{ fontSize: 12 }} />
+							<Line
+								type="monotone"
+								dataKey={col}
+								dot={false}
+								stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+								strokeWidth={1.5}
+							/>
+						</LineChart>
+					</ResponsiveContainer>
+				</div>
+			))}
+		</>
 	)
 }
 

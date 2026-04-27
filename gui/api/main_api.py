@@ -211,15 +211,11 @@ class MainApi:
 			step = max(1, len(df) // 2000)
 			chart_df = df.iloc[::step]
 
-			susp_cols = [c for c in ("t", "a0", "b0") if c in chart_df.columns]
-			imu_cols = [c for c in ("t", "gx", "gy", "gz") if c in chart_df.columns]
-
 			return ok({
 				"columns": list(df.columns),
 				"rows": len(df),
 				"preview": df.head(100).to_dict(orient="records"),
-				"susp_data": chart_df[susp_cols].to_dict(orient="records"),
-				"imu_data": chart_df[imu_cols].to_dict(orient="records"),
+				"chart_data": chart_df.to_dict(orient="records"),
 			})
 		except Exception as e:
 			return err(str(e))
