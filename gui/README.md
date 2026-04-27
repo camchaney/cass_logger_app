@@ -29,6 +29,10 @@ npm run dev
 
 # Terminal 2 — PyWebView host pointing at Vite
 DEV=1 python gui/app.py
+
+# WINDOWS - if running Powershell:
+$env:DEV = "1"
+python gui/app.py
 ```
 
 ## Production build
