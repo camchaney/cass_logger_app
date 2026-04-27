@@ -263,6 +263,36 @@ tr:last-child td { border-bottom: none; }
 }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .tab:hover:not(.active) { color: var(--text); }
+.tab.tab-sm { padding: 5px 10px; font-size: 12px; }
+
+/* Segmented section selector (e.g. IMU / Channels) */
+.tabs-section {
+	display: flex;
+	gap: 0;
+	margin-bottom: 12px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 3px;
+	width: fit-content;
+}
+.tab-section {
+	padding: 5px 18px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	border-radius: calc(var(--radius) - 2px);
+	transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+.tab-section.active {
+	background: var(--surface);
+	color: var(--text);
+	box-shadow: 0 1px 3px rgba(0,0,0,.1);
+}
+.tab-section:hover:not(.active) { color: var(--text); }
 
 /* ── Row utils ──────────────────────────────────────────────────────────────── */
 

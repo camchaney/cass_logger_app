@@ -44,6 +44,7 @@ export default function DataPanel() {
 	const [binResult, setBinResult] = useState<BinParseResult | null>(null)
 	const [binError, setBinError] = useState<string | null>(null)
 	const [binLoading, setBinLoading] = useState(false)
+	const [chartSection, setChartSection] = useState<'imu' | 'channels'>('imu')
 	const [imuGroupKey, setImuGroupKey] = useState('g')
 	const [channelLetter, setChannelLetter] = useState('a')
 
@@ -75,12 +76,11 @@ export default function DataPanel() {
 		const res = await api.parse_bin(binPath, fwVer)
 		if (res.ok && res.data) {
 			setBinResult(res.data)
-			// Default selections to first available group/letter in this file
 			const cols = res.data.columns
 			const firstImu = IMU_GROUPS.find(g => g.cols.some(c => cols.includes(c)))
-			if (firstImu) setImuGroupKey(firstImu.key)
 			const firstCh = CHANNEL_LETTERS.find(l => [`${l}0`, `${l}1`, `${l}2`].some(c => cols.includes(c)))
-			if (firstCh) setChannelLetter(firstCh)
+			if (firstImu) { setChartSection('imu'); setImuGroupKey(firstImu.key) }
+			else if (firstCh) { setChartSection('channels'); setChannelLetter(firstCh) }
 		} else {
 			setBinError(res.error ?? 'Parse failed')
 		}
@@ -149,13 +149,10 @@ export default function DataPanel() {
 		? CHANNEL_LETTERS.filter(l => [`${l}0`, `${l}1`, `${l}2`].some(c => binResult.columns.includes(c)))
 		: []
 
-	const activeImuGroup =
-		availableImuGroups.find(g => g.key === imuGroupKey) ?? availableImuGroups[0]
-
+	const activeImuGroup = availableImuGroups.find(g => g.key === imuGroupKey) ?? availableImuGroups[0]
 	const activeImuCols = activeImuGroup
 		? activeImuGroup.cols.filter(c => binResult!.columns.includes(c))
 		: []
-
 	const activeChannelCols = binResult
 		? [`${channelLetter}0`, `${channelLetter}1`, `${channelLetter}2`].filter(c => binResult.columns.includes(c))
 		: []
@@ -237,45 +234,57 @@ export default function DataPanel() {
 								</div>
 							</div>
 
-							{/* IMU chart */}
-							{availableImuGroups.length > 0 && (
+							{/* Combined chart card */}
+							{(availableImuGroups.length > 0 || availableChannelLetters.length > 0) && (
 								<div className="card">
-									<div className="row" style={{ marginBottom: 10 }}>
-										<span className="card-title" style={{ margin: 0 }}>IMU</span>
-										<div className="tabs" style={{ margin: 0, borderBottom: 'none' }}>
-											{availableImuGroups.map(g => (
+									{/* Section selector */}
+									<div className="tabs-section">
+										{availableImuGroups.length > 0 && (
+											<button
+												className={`tab-section${chartSection === 'imu' ? ' active' : ''}`}
+												onClick={() => setChartSection('imu')}
+											>
+												IMU
+											</button>
+										)}
+										{availableChannelLetters.length > 0 && (
+											<button
+												className={`tab-section${chartSection === 'channels' ? ' active' : ''}`}
+												onClick={() => setChartSection('channels')}
+											>
+												Channels
+											</button>
+										)}
+									</div>
+
+									{/* Sub-tabs */}
+									<div className="tabs" style={{ margin: '0 0 12px' }}>
+										{chartSection === 'imu'
+											? availableImuGroups.map(g => (
 												<button
 													key={g.key}
-													className={`tab${imuGroupKey === g.key ? ' active' : ''}`}
+													className={`tab tab-sm${imuGroupKey === g.key ? ' active' : ''}`}
 													onClick={() => setImuGroupKey(g.key)}
 												>
 													{g.label}
 												</button>
-											))}
-										</div>
-									</div>
-									<StackedCharts data={binResult.chart_data} cols={activeImuCols} />
-								</div>
-							)}
-
-							{/* Channel chart */}
-							{availableChannelLetters.length > 0 && (
-								<div className="card">
-									<div className="row" style={{ marginBottom: 10 }}>
-										<span className="card-title" style={{ margin: 0 }}>Channels</span>
-										<div className="tabs" style={{ margin: 0, borderBottom: 'none' }}>
-											{availableChannelLetters.map(l => (
+											))
+											: availableChannelLetters.map(l => (
 												<button
 													key={l}
-													className={`tab${channelLetter === l ? ' active' : ''}`}
+													className={`tab tab-sm${channelLetter === l ? ' active' : ''}`}
 													onClick={() => setChannelLetter(l)}
 												>
 													{l.toUpperCase()}
 												</button>
-											))}
-										</div>
+											))
+										}
 									</div>
-									<StackedCharts data={binResult.chart_data} cols={activeChannelCols} />
+
+									<StackedCharts
+										data={binResult.chart_data}
+										cols={chartSection === 'imu' ? activeImuCols : activeChannelCols}
+									/>
 								</div>
 							)}
 						</>
