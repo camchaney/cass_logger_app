@@ -84,12 +84,6 @@ export default function App() {
 		setStatus({ connected: false })
 	}
 
-	const statusLabel = connecting
-		? 'Connecting…'
-		: status.connected
-		? `${status.fw_ver ?? 'Connected'} · ${status.device_id ?? ''}`
-		: status.error ?? 'Not connected'
-
 	return (
 		<div className="layout">
 			<header className="header">
@@ -100,7 +94,22 @@ export default function App() {
 							connecting ? 'connecting' : status.connected ? 'connected' : 'disconnected'
 						}`}
 					/>
-					<span className="status-text">{statusLabel}</span>
+					{connecting ? (
+						<span className="status-text">Connecting…</span>
+					) : status.connected ? (
+						<span className="status-text" style={{ display: 'flex', gap: 16 }}>
+							<span>
+								<span className="muted" style={{ fontSize: 12, marginRight: 4 }}>FW</span>
+								<strong>{status.fw_ver ?? '—'}</strong>
+							</span>
+							<span>
+								<span className="muted" style={{ fontSize: 12, marginRight: 4 }}>ID</span>
+								<strong>{status.device_id ?? '—'}</strong>
+							</span>
+						</span>
+					) : (
+						<span className="status-text">{status.error ?? 'Not connected'}</span>
+					)}
 					{status.connected ? (
 						<button className="btn btn-secondary" onClick={handleDisconnect}>
 							Disconnect
