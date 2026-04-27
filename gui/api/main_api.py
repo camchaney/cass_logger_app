@@ -37,15 +37,13 @@ class MainApi:
 		return ok("Disconnected")
 
 	def get_status(self) -> dict:
-		if not self._svc.is_connected:
+		if not self._svc.check_alive():
 			return ok({"connected": False})
-		try:
-			fw = self._svc.cass.get_fw_ver()
-			device_id = self._svc.cass.get_device_ID()
-			return ok({"connected": True, "fw_ver": fw, "device_id": device_id})
-		except Exception as e:
-			self._svc.disconnect()
-			return ok({"connected": False, "error": str(e)})
+		return ok({
+			"connected": True,
+			"fw_ver": self._svc.fw_ver,
+			"device_id": self._svc.device_id,
+		})
 
 	def list_ports(self) -> dict:
 		ports = serial.tools.list_ports.comports()

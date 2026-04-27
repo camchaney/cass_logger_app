@@ -23,22 +23,35 @@ export default function App() {
 	const [status, setStatus] = useState<DeviceStatus>({ connected: false })
 	const [connecting, setConnecting] = useState(false)
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+	// Guards against concurrent connect attempts from overlapping poll ticks
+	const connectingRef = useRef(false)
+	// Set true after manual disconnect so polling doesn't immediately reconnect
+	const manuallyDisconnectedRef = useRef(false)
 
 	const refreshStatus = useCallback(async () => {
 		const api = getApi()
 		if (!api) return
 		const res = await api.get_status()
-		if (res.ok && res.data) setStatus(res.data)
+		if (!res.ok || !res.data) return
+		setStatus(res.data)
+
+		if (!res.data.connected && !connectingRef.current && !manuallyDisconnectedRef.current) {
+			connectingRef.current = true
+			setConnecting(true)
+			await api.connect()
+			const s2 = await api.get_status()
+			if (s2.ok && s2.data) setStatus(s2.data)
+			setConnecting(false)
+			connectingRef.current = false
+		}
 	}, [])
 
 	useEffect(() => {
-		// PyWebView fires a 'pywebviewready' event when the bridge is available
 		const onReady = () => {
 			refreshStatus()
 			pollRef.current = setInterval(refreshStatus, 5000)
 		}
 		window.addEventListener('pywebviewready', onReady)
-		// Also try immediately in case the event already fired (dev hot-reload)
 		if (window.pywebview?.api) onReady()
 		return () => {
 			window.removeEventListener('pywebviewready', onReady)
@@ -48,17 +61,25 @@ export default function App() {
 
 	const handleConnect = async () => {
 		const api = getApi()
-		if (!api) return
+		if (!api || connectingRef.current) return
+		manuallyDisconnectedRef.current = false
+		connectingRef.current = true
 		setConnecting(true)
 		const res = await api.connect()
-		if (res.ok) await refreshStatus()
-		else setStatus({ connected: false, error: res.error ?? undefined })
+		if (res.ok) {
+			const s = await api.get_status()
+			if (s.ok && s.data) setStatus(s.data)
+		} else {
+			setStatus({ connected: false, error: res.error ?? undefined })
+		}
 		setConnecting(false)
+		connectingRef.current = false
 	}
 
 	const handleDisconnect = async () => {
 		const api = getApi()
 		if (!api) return
+		manuallyDisconnectedRef.current = true
 		await api.disconnect()
 		setStatus({ connected: false })
 	}
