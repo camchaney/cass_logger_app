@@ -1,17 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DeviceStatus } from './types'
-import ConfigPanel from './components/ConfigPanel'
 import DataPanel from './components/DataPanel'
 import DevicePanel from './components/DevicePanel'
 import FilesPanel from './components/FilesPanel'
 
-type Panel = 'device' | 'files' | 'data' | 'config'
+type Panel = 'device' | 'files' | 'data'
 
 const NAV: { id: Panel; label: string; icon: string }[] = [
 	{ id: 'device', label: 'Device', icon: '🔌' },
 	{ id: 'files', label: 'Files', icon: '📁' },
 	{ id: 'data', label: 'Data', icon: '📊' },
-	{ id: 'config', label: 'Config', icon: '⚙️' },
 ]
 
 function getApi() {
@@ -149,9 +147,6 @@ export default function App() {
 				)}
 				{panel === 'files' && <FilesPanel connected={status.connected} />}
 				{panel === 'data' && <DataPanel />}
-				{panel === 'config' && (
-					<ConfigPanel connected={status.connected} onRefresh={refreshStatus} />
-				)}
 			</main>
 		</div>
 	)
