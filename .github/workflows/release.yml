@@ -44,6 +44,9 @@ jobs:
           npm ci
           npm run build
 
+      - name: Remove obsolete pathlib backport
+        run: pip uninstall -y pathlib || true
+
       - name: Build with PyInstaller
         run: pyinstaller CassLogger.spec --distpath gui/dist --workpath gui/build
 
