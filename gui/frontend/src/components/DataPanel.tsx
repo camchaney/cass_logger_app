@@ -4,6 +4,7 @@ import {
 	CartesianGrid,
 	Line,
 	LineChart,
+	ReferenceArea,
 	ResponsiveContainer,
 	Tooltip,
 	XAxis,
@@ -403,18 +404,73 @@ function StackedCharts({
 	data: Record<string, number>[]
 	cols: string[]
 }) {
+	const [refAreaLeft, setRefAreaLeft] = useState<number | null>(null)
+	const [refAreaRight, setRefAreaRight] = useState<number | null>(null)
+	const [isSelecting, setIsSelecting] = useState(false)
+	const [xDomain, setXDomain] = useState<[number, number] | null>(null)
+
+	const onMouseDown = (e: { activeLabel?: string | number }) => {
+		if (e?.activeLabel == null) return
+		setRefAreaLeft(Number(e.activeLabel))
+		setIsSelecting(true)
+	}
+
+	const onMouseMove = (e: { activeLabel?: string | number }) => {
+		if (!isSelecting || e?.activeLabel == null) return
+		setRefAreaRight(Number(e.activeLabel))
+	}
+
+	const onMouseUp = () => {
+		if (!isSelecting) return
+		setIsSelecting(false)
+		if (refAreaLeft === null || refAreaRight === null || refAreaLeft === refAreaRight) {
+			setRefAreaLeft(null)
+			setRefAreaRight(null)
+			return
+		}
+		const [l, r] = refAreaLeft < refAreaRight
+			? [refAreaLeft, refAreaRight]
+			: [refAreaRight, refAreaLeft]
+		setXDomain([l, r])
+		setRefAreaLeft(null)
+		setRefAreaRight(null)
+	}
+
+	const resetZoom = () => {
+		setXDomain(null)
+		setRefAreaLeft(null)
+		setRefAreaRight(null)
+		setIsSelecting(false)
+	}
+
+	const xAxisDomain: [number | string, number | string] = xDomain ?? ['auto', 'auto']
+
 	return (
 		<>
+			{xDomain && (
+				<div style={{ marginBottom: 8, display: 'flex', justifyContent: 'flex-end' }}>
+					<button className="btn btn-ghost" onClick={resetZoom} style={{ fontSize: 12 }}>
+						↺ Reset zoom
+					</button>
+				</div>
+			)}
 			{cols.map((col, idx) => (
 				<div key={col} style={{ marginBottom: idx < cols.length - 1 ? 16 : 0 }}>
 					<div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>{col}</div>
 					<ResponsiveContainer width="100%" height={140}>
-						<LineChart data={data}>
+						<LineChart
+							data={data}
+							onMouseDown={onMouseDown}
+							onMouseMove={onMouseMove}
+							onMouseUp={onMouseUp}
+							style={{ cursor: 'crosshair', userSelect: 'none' }}
+						>
 							<CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
 							<XAxis
 								dataKey="t"
 								type="number"
-								domain={['auto', 'auto']}
+								domain={xAxisDomain}
+								allowDataOverflow
 								tick={{ fontSize: 10 }}
 								label={{ value: 't (s)', position: 'insideBottomRight', offset: -4, fontSize: 10 }}
 							/>
@@ -426,7 +482,18 @@ function StackedCharts({
 								dot={false}
 								stroke={CHART_COLORS[idx % CHART_COLORS.length]}
 								strokeWidth={1.5}
+								isAnimationActive={false}
 							/>
+							{isSelecting && refAreaLeft !== null && refAreaRight !== null && (
+								<ReferenceArea
+									x1={refAreaLeft}
+									x2={refAreaRight}
+									fill="#3b82f6"
+									fillOpacity={0.15}
+									stroke="#3b82f6"
+									strokeOpacity={0.5}
+								/>
+							)}
 						</LineChart>
 					</ResponsiveContainer>
 				</div>
