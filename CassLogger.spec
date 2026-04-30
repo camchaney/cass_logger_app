@@ -32,6 +32,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='gui/assets/CassLogger.ico',
 )
 coll = COLLECT(
     exe,
@@ -45,6 +46,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='CassLogger.app',
-    icon=None,
+    icon='gui/assets/CassLogger.icns',
     bundle_identifier=None,
 )
