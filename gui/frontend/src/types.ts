@@ -116,6 +116,7 @@ export interface PyApi {
 	pick_file(file_types?: string[]): Promise<ApiResult<string | null>>
 	pick_directory(): Promise<ApiResult<string | null>>
 	pick_save_file(file_types?: string[]): Promise<ApiResult<string | null>>
+	open_folder(path: string): Promise<ApiResult<null>>
 	// Update
 	get_update_state(): Promise<ApiResult<UpdateState>>
 	start_update_download(): Promise<ApiResult<string>>

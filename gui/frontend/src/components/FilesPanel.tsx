@@ -21,6 +21,7 @@ export default function FilesPanel({ connected }: Props) {
 	const [downloading, setDownloading] = useState(false)
 	const [taskStatus, setTaskStatus] = useState<TaskStatus | null>(null)
 	const [downloadMsg, setDownloadMsg] = useState<{ ok: boolean; text: string } | null>(null)
+	const [downloadPath, setDownloadPath] = useState<string | null>(null)
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
 	const [confirmDelete, setConfirmDelete] = useState(false)
@@ -52,6 +53,7 @@ export default function FilesPanel({ connected }: Props) {
 		setDownloading(true)
 		setDownloadMsg(null)
 		setTaskStatus(null)
+		setDownloadPath(null)
 
 		const res = await api.start_download(dirRes.data)
 		if (!res.ok || !res.data) {
@@ -68,6 +70,7 @@ export default function FilesPanel({ connected }: Props) {
 				if (st.data.status === 'done') {
 					clearInterval(pollRef.current!)
 					setDownloading(false)
+					if (st.data.result) setDownloadPath(st.data.result)
 					setDownloadMsg({
 						ok: true,
 						text: st.data.error
@@ -182,14 +185,24 @@ export default function FilesPanel({ connected }: Props) {
 					</div>
 				)}
 
-				<button
-					className="btn btn-primary"
-					onClick={startDownload}
-					disabled={downloading || files.length === 0}
-				>
-					{downloading ? <span className="spinner" /> : '⬇'}
-					{downloading ? ' Downloading…' : ' Download All'}
-				</button>
+				<div className="row" style={{ gap: 8 }}>
+					<button
+						className="btn btn-primary"
+						onClick={startDownload}
+						disabled={downloading || files.length === 0}
+					>
+						{downloading ? <span className="spinner" /> : '⬇'}
+						{downloading ? ' Downloading…' : ' Download All'}
+					</button>
+					{downloadPath && !downloading && (
+						<button
+							className="btn btn-secondary"
+							onClick={() => api?.open_folder(downloadPath)}
+						>
+							Open Folder
+						</button>
+					)}
+				</div>
 			</div>
 
 			{/* Delete */}

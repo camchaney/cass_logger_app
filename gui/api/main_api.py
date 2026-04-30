@@ -288,6 +288,20 @@ class MainApi:
 		except Exception as e:
 			return err(str(e))
 
+	def open_folder(self, path: str) -> dict:
+		import subprocess
+		try:
+			system = platform.system()
+			if system == "Darwin":
+				subprocess.Popen(["open", path])
+			elif system == "Windows":
+				subprocess.Popen(["explorer", path])
+			else:
+				subprocess.Popen(["xdg-open", path])
+			return ok(None)
+		except Exception as e:
+			return err(str(e))
+
 	# ── Update ─────────────────────────────────────────────────────────────────
 
 	def get_update_state(self) -> dict:
