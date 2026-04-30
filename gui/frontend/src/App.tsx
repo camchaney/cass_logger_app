@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DeviceStatus, UpdateState } from './types'
+import logo from './assets/logo.png'
 import DataPanel from './components/DataPanel'
 import DevicePanel from './components/DevicePanel'
 import FilesPanel from './components/FilesPanel'
@@ -117,6 +118,7 @@ export default function App() {
 	return (
 		<div className="layout">
 			<header className="header">
+				<img src={logo} alt="" style={{ height: 40, width: 40 }} />
 				<span className="header-title">Cass Logger</span>
 				<div className="header-status">
 					<div
