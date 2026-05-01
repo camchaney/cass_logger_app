@@ -40,6 +40,7 @@ export default function DataPanel() {
 
 	// ── .bin state ─────────────────────────────────────────────────────────────
 	const [binPath, setBinPath] = useState<string | null>(null)
+	const [recordingStart, setRecordingStart] = useState<string | null>(null)
 	const [fwVer, setFwVer] = useState('std')
 	const [fwVerSource, setFwVerSource] = useState<'metadata' | 'default' | null>(null)
 	const [binResult, setBinResult] = useState<BinParseResult | null>(null)
@@ -72,8 +73,12 @@ export default function DataPanel() {
 		setBinResult(null)
 		setBinError(null)
 
-		// Extract directory (handles both / and \ separators)
 		const sep = path.includes('\\') ? '\\' : '/'
+		const filename = path.split(/[\\/]/).pop() ?? ''
+		const tsMatch = filename.match(/(\d{9,11})\.bin$/i)
+		setRecordingStart(tsMatch ? new Date(parseInt(tsMatch[1], 10) * 1000).toUTCString() : null)
+
+		// Extract directory (handles both / and \ separators)
 		const dir = path.substring(0, path.lastIndexOf(sep))
 		const metaRes = await api.find_metadata(dir)
 		if (metaRes.ok && metaRes.data?.firmware_version) {
@@ -207,12 +212,27 @@ export default function DataPanel() {
 
 						{fwVerSource === 'default' && (
 							<div className="alert alert-warning" style={{ marginBottom: 12 }}>
-								No metadata file found. This should always be in the same directory as your .bin files. Defaulting to <strong>std</strong> firmware.
+								<div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: 16, rowGap: 2, marginBottom: 8 }}>
+									{recordingStart && (<>
+										<span className="muted" style={{ fontSize: 12 }}>Recorded</span>
+										<span className="mono">{recordingStart}</span>
+									</>)}
+									<span className="muted" style={{ fontSize: 12 }}>Firmware</span>
+									<span className="mono">{fwVer}</span>
+								</div>
+								No metadata file found — defaulting to <strong>std</strong> firmware.
 							</div>
 						)}
 						{fwVerSource === 'metadata' && (
 							<div className="alert alert-info" style={{ marginBottom: 12 }}>
-								Firmware version detected from metadata: <strong className="mono">{fwVer}</strong>
+								<div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: 16, rowGap: 2 }}>
+									{recordingStart && (<>
+										<span className="muted" style={{ fontSize: 12 }}>Recorded</span>
+										<span className="mono">{recordingStart}</span>
+									</>)}
+									<span className="muted" style={{ fontSize: 12 }}>Firmware</span>
+									<span className="mono">{fwVer}</span>
+								</div>
 							</div>
 						)}
 

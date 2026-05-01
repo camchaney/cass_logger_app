@@ -144,17 +144,25 @@ export default function FilesPanel({ connected }: Props) {
 								<tr>
 									<th>#</th>
 									<th>Filename</th>
+									<th>Recorded (UTC)</th>
 									<th>Size</th>
 								</tr>
 							</thead>
 							<tbody>
-								{files.map((f, i) => (
-									<tr key={f.name}>
-										<td className="muted">{i + 1}</td>
-										<td className="mono">{f.name}</td>
-										<td>{fmtBytes(f.size)}</td>
-									</tr>
-								))}
+								{files.map((f, i) => {
+									const tsMatch = f.name.match(/(\d{9,11})\.bin$/i)
+									const recorded = tsMatch
+										? new Date(parseInt(tsMatch[1], 10) * 1000).toUTCString()
+										: '—'
+									return (
+										<tr key={f.name}>
+											<td className="muted">{i + 1}</td>
+											<td className="mono">{f.name}</td>
+											<td className="mono">{recorded}</td>
+											<td>{fmtBytes(f.size)}</td>
+										</tr>
+									)
+								})}
 							</tbody>
 						</table>
 					</div>
