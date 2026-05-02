@@ -13,8 +13,6 @@ jobs:
         include:
           - os: macos-latest   # arm64
             platform_key: darwin-arm64
-          - os: macos-13       # x86_64
-            platform_key: darwin-x86_64
           - os: windows-latest
             platform_key: win32-x64
 

@@ -30,7 +30,6 @@ artifacts_dir = Path("artifacts")
 
 platform_files = {
 	"darwin-arm64": f"CassLogger-{TAG}-darwin-arm64.dmg",
-	"darwin-x86_64": f"CassLogger-{TAG}-darwin-x86_64.dmg",
 	"win32-x64": f"CassLogger-{TAG}-win32-x64.exe",
 }
 
