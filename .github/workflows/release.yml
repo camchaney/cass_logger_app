@@ -100,7 +100,9 @@ jobs:
           name: ${{ matrix.platform_key }}
           path: |
             gui/dist/CassLogger-*.dmg
+            gui/dist/CassLogger-*.dmg.sha256
             gui/dist/CassLogger-*.exe
+            gui/dist/CassLogger-*.exe.sha256
           if-no-files-found: error
 
   publish:
