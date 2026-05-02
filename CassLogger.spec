@@ -1,5 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+sys.path.insert(0, '.')
+from gui.__version__ import VERSION
 
 a = Analysis(
     ['gui/app.py'],
@@ -48,4 +51,5 @@ app = BUNDLE(
     name='CassLogger.app',
     icon='gui/assets/CassLogger.icns',
     bundle_identifier=None,
+    version=VERSION,
 )
