@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import platform
+import ssl
 import subprocess
 import sys
 import threading
@@ -12,6 +13,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 from typing import Optional
+
+import certifi
 
 import platformdirs
 
@@ -209,7 +212,8 @@ class UpdateService:
 		dest = cache_dir / url.split("/")[-1]
 
 		try:
-			with urllib.request.urlopen(url, timeout=30) as response:
+			ctx = ssl.create_default_context(cafile=certifi.where())
+			with urllib.request.urlopen(url, timeout=30, context=ctx) as response:
 				total = int(response.headers.get("Content-Length", 0))
 				task["total_bytes"] = total
 				sha = hashlib.sha256()
@@ -274,5 +278,6 @@ class UpdateService:
 
 
 def _fetch_manifest() -> dict:
-	with urllib.request.urlopen(MANIFEST_URL, timeout=10) as resp:
+	ctx = ssl.create_default_context(cafile=certifi.where())
+	with urllib.request.urlopen(MANIFEST_URL, timeout=10, context=ctx) as resp:
 		return json.loads(resp.read())
