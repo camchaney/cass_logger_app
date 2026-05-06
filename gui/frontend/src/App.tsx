@@ -170,6 +170,10 @@ export default function App() {
 						{n.label}
 					</button>
 				))}
+				<div className="sidebar-footer">
+					<div>v{__APP_VERSION__}</div>
+					<div>© Cass Labs LLC</div>
+				</div>
 			</nav>
 
 			<main className="content">

@@ -119,6 +119,15 @@ html, body, #root {
 .nav-item:hover { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
 .nav-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
 
+.sidebar-footer {
+	margin-top: auto;
+	padding: 12px;
+	font-size: 11px;
+	color: var(--sidebar-text);
+	opacity: 0.6;
+	line-height: 1.6;
+}
+
 .nav-icon { font-size: 16px; flex-shrink: 0; }
 
 /* ── Main content ──────────────────────────────────────────────────────────── */
