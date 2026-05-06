@@ -90,7 +90,7 @@ export default function UpdateBanner({ updateState, onDismiss, onSkip }: Props) 
 					</button>
 				</>
 			)}
-			{!isHard && !taskId && (
+			{!taskId && (
 				<>
 					<button className="btn btn-secondary" onClick={onDismiss}>
 						Later
@@ -103,30 +103,14 @@ export default function UpdateBanner({ updateState, onDismiss, onSkip }: Props) 
 		</div>
 	)
 
-	if (isHard) {
-		return (
-			<div className="update-overlay">
-				<div className="update-modal">
-					<div className="update-modal-title">Update Required</div>
-					<p className="update-modal-body">
-						This version ({updateState.installed_version}) is no longer supported.
-						Please update to v{version} to continue using the app.
-					</p>
-					{updateState.changelog && (
-						<p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
-							{updateState.changelog}
-						</p>
-					)}
-					{actions}
-				</div>
-			</div>
-		)
-	}
-
 	return (
-		<div className="update-banner">
+		<div className={`update-banner${isHard ? ' update-banner-hard' : ''}`}>
 			<div className="update-banner-message">
-				<strong>Update available: v{version}</strong>
+				<strong>
+					{isHard
+						? `v${version} required — this version may have compatibility issues`
+						: `Update available: v${version}`}
+				</strong>
 				{updateState.changelog && (
 					<span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>
 						{updateState.changelog}
