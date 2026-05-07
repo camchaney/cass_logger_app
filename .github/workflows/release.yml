@@ -45,6 +45,9 @@ jobs:
       - name: Remove obsolete pathlib backport
         run: pip uninstall -y pathlib || true
 
+      - name: Fetch Teensy flash tools
+        run: python scripts/fetch_teensy_tools.py
+
       - name: Build with PyInstaller
         run: pyinstaller CassLogger.spec --distpath gui/dist --workpath gui/build
 

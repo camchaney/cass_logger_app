@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { DeviceStatus, PortInfo } from '../types'
+import FirmwarePanel from './FirmwarePanel'
 import InfoTip from './InfoTip'
 
 interface Props {
@@ -441,6 +442,10 @@ export default function DevicePanel({ status, onConnected }: Props) {
 					</div>
 				</>
 			)}
+
+			<div style={{ marginTop: 24 }}>
+				<FirmwarePanel status={status} />
+			</div>
 		</div>
 	)
 }

@@ -153,6 +153,9 @@ gui/dist/
 gui/frontend/node_modules/
 gui/frontend/dist/
 
+# Teensy tools — fetched at build time by scripts/fetch_teensy_tools.py
+bin/tool-teensy/
+
 # PyCharm
 #  JetBrains specific template is maintainted in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore

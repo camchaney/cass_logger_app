@@ -70,6 +70,31 @@ export interface UpdateDownloadStatus {
 	error: string | null
 }
 
+export interface FirmwareState {
+	state: 'unknown' | 'ready' | 'error'
+	latest_version: string | null
+	changelog: string | null
+	available_variants: string[]
+	installed_version: string | null
+	error: string | null
+}
+
+export interface FirmwareDownloadStatus {
+	status: 'running' | 'done' | 'error'
+	progress: number
+	downloaded_bytes: number
+	total_bytes: number
+	hex_path: string | null
+	error: string | null
+}
+
+export interface FirmwareFlashStatus {
+	status: 'running' | 'done' | 'error'
+	stage: 'rebooting' | 'flashing' | 'done' | 'error'
+	output: string
+	error: string | null
+}
+
 export interface WindowsPortDiag {
 	device: string
 	description: string
@@ -124,6 +149,12 @@ export interface PyApi {
 	restart_and_install(task_id: string): Promise<ApiResult<string>>
 	dismiss_update(): Promise<ApiResult<null>>
 	skip_update_version(version: string): Promise<ApiResult<null>>
+	// Firmware
+	get_firmware_state(): Promise<ApiResult<FirmwareState>>
+	start_firmware_download(variant: string): Promise<ApiResult<string>>
+	get_firmware_download_status(task_id: string): Promise<ApiResult<FirmwareDownloadStatus>>
+	start_firmware_flash(download_task_id: string, variant: string): Promise<ApiResult<string>>
+	get_firmware_flash_status(flash_id: string): Promise<ApiResult<FirmwareFlashStatus>>
 	// Cloud
 	cloud_status(): Promise<ApiResult<{ available: boolean; message: string }>>
 }

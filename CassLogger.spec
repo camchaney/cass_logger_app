@@ -4,11 +4,19 @@ import sys
 sys.path.insert(0, '.')
 from gui.__version__ import VERSION
 
+import os
+
+def _teensy_datas():
+    """Bundle the whole tool-teensy directory if present (preserves lib/ relative paths)."""
+    if os.path.isdir("bin/tool-teensy"):
+        return [("bin/tool-teensy", "bin/tool-teensy")]
+    return []
+
 a = Analysis(
     ['gui/app.py'],
     pathex=[],
     binaries=[],
-    datas=[('gui/frontend/dist', 'gui/frontend/dist'), ('src', 'src')],
+    datas=[('gui/frontend/dist', 'gui/frontend/dist'), ('src', 'src')] + _teensy_datas(),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

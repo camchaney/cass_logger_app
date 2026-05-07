@@ -333,6 +333,36 @@ class MainApi:
 		UpdateService().skip_version(version)
 		return ok(None)
 
+	# ── Firmware ───────────────────────────────────────────────────────────────
+
+	def get_firmware_state(self) -> dict:
+		from gui.services.firmware_service import FirmwareService
+		svc = FirmwareService()
+		svc.start_check()
+		return ok(svc.get_state())
+
+	def start_firmware_download(self, variant: str) -> dict:
+		from gui.services.firmware_service import FirmwareService
+		task_id = FirmwareService().start_download(variant)
+		return ok(task_id)
+
+	def get_firmware_download_status(self, task_id: str) -> dict:
+		from gui.services.firmware_service import FirmwareService
+		status = FirmwareService().get_download_status(task_id)
+		return ok(status) if status is not None else err("Unknown firmware download task ID")
+
+	def start_firmware_flash(self, download_task_id: str, variant: str) -> dict:
+		"""Disconnect serial, then flash. The app's poll loop will auto-reconnect after."""
+		self._svc.disconnect()
+		from gui.services.firmware_service import FirmwareService
+		flash_id = FirmwareService().start_flash(download_task_id, variant)
+		return ok(flash_id)
+
+	def get_firmware_flash_status(self, flash_id: str) -> dict:
+		from gui.services.firmware_service import FirmwareService
+		status = FirmwareService().get_flash_status(flash_id)
+		return ok(status) if status is not None else err("Unknown firmware flash task ID")
+
 	# ── Cloud (stub) ────────────────────────────────────────────────────────────
 
 	def cloud_status(self) -> dict:
