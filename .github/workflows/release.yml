@@ -27,9 +27,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -r gui/requirements.txt
+        run: pip install -e .
 
       - name: Set up Node 20
         uses: actions/setup-node@v4.4.0
