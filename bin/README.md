@@ -23,7 +23,7 @@ Copy the appropriate binaries into this `bin/` directory.
 ### Option B — Build from source
 
 - `teensy_loader_cli`: https://github.com/PaulStoffregen/teensy_loader_cli
-- `teensy_reboot`: included in the Teensy tools repo or available via `brew install teensy-loader-cli` on macOS
+- `teensy_reboot`: included in the Teensy tools repo or available via `brew install teensy_loader_cli` on macOS
 
 ## CI/CD
 

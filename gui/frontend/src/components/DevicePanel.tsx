@@ -320,6 +320,10 @@ export default function DevicePanel({ status, onConnected }: Props) {
 				)}
 			</div>
 
+			<div style={{ marginTop: 24 }}>
+				<FirmwarePanel status={status} />
+			</div>
+
 			{/* ── Configuration ─────────────────────────────────────────────────────── */}
 
 			{status.connected && (
@@ -442,10 +446,6 @@ export default function DevicePanel({ status, onConnected }: Props) {
 					</div>
 				</>
 			)}
-
-			<div style={{ marginTop: 24 }}>
-				<FirmwarePanel status={status} />
-			</div>
 		</div>
 	)
 }

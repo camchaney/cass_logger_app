@@ -45,6 +45,10 @@ jobs:
       - name: Remove obsolete pathlib backport
         run: pip uninstall -y pathlib || true
 
+      - name: Install teensy_loader_cli (macOS)
+        if: runner.os == 'macOS'
+        run: brew install teensy_loader_cli
+
       - name: Fetch Teensy flash tools
         run: python scripts/fetch_teensy_tools.py
 

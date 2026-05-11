@@ -52,6 +52,22 @@ def main() -> None:
         if p.exists():
             p.chmod(p.stat().st_mode | 0o111)
 
+    # teensy_loader_cli was removed from recent tool-teensy packages.
+    # Copy it from Homebrew if available and not already present.
+    loader = DEST / "teensy_loader_cli"
+    if not loader.exists():
+        for candidate in (Path("/opt/homebrew/bin/teensy_loader_cli"),
+                          Path("/usr/local/bin/teensy_loader_cli")):
+            if candidate.exists():
+                import shutil
+                shutil.copy2(candidate, loader)
+                loader.chmod(loader.stat().st_mode | 0o111)
+                print(f"Copied teensy_loader_cli from {candidate}")
+                break
+        else:
+            print("Warning: teensy_loader_cli not found in tool-teensy package or Homebrew.")
+            print("  Install it with: brew install teensy_loader_cli")
+
     print("Done.")
 
 if __name__ == "__main__":

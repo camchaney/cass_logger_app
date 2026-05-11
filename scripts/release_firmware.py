@@ -29,6 +29,7 @@ from pathlib import Path
 # Firmware project is assumed to sit next to cass_logger_dev/
 FIRMWARE_DIR = Path(__file__).resolve().parent.parent.parent / "cassLogger"
 HEX_PATH     = FIRMWARE_DIR / ".pio" / "build" / "teensy41" / "firmware.hex"
+PIO          = Path.home() / ".platformio" / "penv" / "bin" / "pio"
 
 BUCKET      = "cass-logger-firmware"
 R2_ENDPOINT = "https://3dcf54c93bec8bb69b6170a316c1c6a8.r2.cloudflarestorage.com/cass-logger-firmware"
@@ -70,7 +71,7 @@ def main() -> None:
 
 	# ── Build ──────────────────────────────────────────────────────────────────
 	print(f"Building firmware v{version}…")
-	result = subprocess.run(["pio", "run"], cwd=FIRMWARE_DIR)
+	result = subprocess.run([str(PIO), "run"], cwd=FIRMWARE_DIR)
 	if result.returncode != 0:
 		print("Build failed.")
 		sys.exit(1)
@@ -100,8 +101,8 @@ def main() -> None:
 	s3 = boto3.client(
 		"s3",
 		endpoint_url=R2_ENDPOINT,
-		aws_access_key_id=require_env("R2_ACCESS_KEY_ID"),
-		aws_secret_access_key=require_env("R2_SECRET_ACCESS_KEY"),
+		aws_access_key_id=require_env("r2_accessKey"),
+		aws_secret_access_key=require_env("r2_secretKey"),
 		region_name="auto",
 	)
 

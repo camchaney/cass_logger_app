@@ -22,17 +22,27 @@ export default function FirmwarePanel({ status }: Props) {
 	const dlPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 	const flashPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-	// Auto-detect variant from connected device
+	// Default to first available variant from manifest once loaded
 	useEffect(() => {
-		if (status.fw_ver) setVariant(status.fw_ver)
-	}, [status.fw_ver])
+		if (fwState?.available_variants.length) setVariant(fwState.available_variants[0])
+	}, [fwState?.available_variants])
 
-	// Fetch firmware manifest on mount
+	// Poll firmware manifest until it resolves from 'unknown'
+	const fwStatePollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 	useEffect(() => {
 		if (!api) return
-		api.get_firmware_state().then((res) => {
-			if (res.ok && res.data) setFwState(res.data)
-		})
+		const check = async () => {
+			const res = await api.get_firmware_state()
+			if (!res.ok || !res.data) return
+			setFwState(res.data)
+			if (res.data.state !== 'unknown' && fwStatePollRef.current) {
+				clearInterval(fwStatePollRef.current)
+				fwStatePollRef.current = null
+			}
+		}
+		check()
+		fwStatePollRef.current = setInterval(check, 2000)
+		return () => { if (fwStatePollRef.current) clearInterval(fwStatePollRef.current) }
 	}, [api])
 
 	// Poll download status
@@ -115,7 +125,7 @@ export default function FirmwarePanel({ status }: Props) {
 			<div className="card">
 				<div className="card-title">Device Firmware</div>
 				<div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: 16, rowGap: 6 }}>
-					<span className="muted" style={{ fontSize: 12 }}>Variant</span>
+					<span className="muted" style={{ fontSize: 12 }}>Installed version</span>
 					<span className="mono">{status.connected ? (status.fw_ver ?? '—') : '—'}</span>
 					<span className="muted" style={{ fontSize: 12 }}>Latest available</span>
 					<span className="mono">

@@ -34,7 +34,17 @@ _BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", _ROOT))
 
 def _tool(name: str) -> Path:
 	suffix = ".exe" if platform.system() == "Windows" else ""
-	return _BUNDLE_DIR / "bin" / "tool-teensy" / (name + suffix)
+	full = name + suffix
+	# Prefer bundled copy (works in packaged app and after fetch_teensy_tools.py)
+	bundled = _BUNDLE_DIR / "bin" / "tool-teensy" / full
+	if bundled.exists():
+		return bundled
+	# Fall back to Homebrew (dev machine)
+	for prefix in (Path("/opt/homebrew/bin"), Path("/usr/local/bin")):
+		p = prefix / full
+		if p.exists():
+			return p
+	return bundled  # return missing path so caller reports a clear error
 
 
 def _parse_ver(v: str) -> tuple[int, ...]:
@@ -152,7 +162,8 @@ class FirmwareService:
 		dest = _CACHE_DIR / f"firmware_{variant}.hex"
 		try:
 			ctx = ssl.create_default_context(cafile=certifi.where())
-			with urllib.request.urlopen(url, timeout=30, context=ctx) as response:
+			req = urllib.request.Request(url, headers={"User-Agent": "CassLogger"})
+			with urllib.request.urlopen(req, timeout=30, context=ctx) as response:
 				total = int(response.headers.get("Content-Length", 0))
 				task["total_bytes"] = total
 				sha = hashlib.sha256()
@@ -218,35 +229,29 @@ class FirmwareService:
 		reboot_bin = _tool("teensy_reboot")
 		loader_bin = _tool("teensy_loader_cli")
 
-		# Ensure binaries are executable on Unix
 		for b in (reboot_bin, loader_bin):
 			if b.exists() and platform.system() != "Windows":
 				b.chmod(b.stat().st_mode | 0o111)
 
-		# Stage 1: soft-reboot device into bootloader via USB HID
-		task["stage"] = "rebooting"
-		task["output"] = "Sending reboot signal to device…"
-		if reboot_bin.exists():
-			try:
-				subprocess.run(
-					[str(reboot_bin)],
-					timeout=10,
-					capture_output=True,
-				)
-			except Exception:
-				pass  # fall through — user may press the button manually
-		else:
-			task["output"] = "teensy_reboot not found — press the PROGRAM button on your device."
-
-		# Stage 2: flash via HID bootloader
-		task["stage"] = "flashing"
 		if not loader_bin.exists():
 			task.update({
 				"status": "error",
-				"error": f"teensy_loader_cli not found at {loader_bin}. See bin/README.md.",
+				"error": f"teensy_loader_cli not found. Run: brew install teensy_loader_cli",
 			})
 			return
 
+		# Step 1: trigger bootloader via teensy_reboot (stage stays "rebooting")
+		task["output"] = "Rebooting device into bootloader…"
+		if reboot_bin.exists():
+			try:
+				subprocess.run([str(reboot_bin)], timeout=10, capture_output=True)
+			except Exception:
+				pass
+		else:
+			task["output"] = "Press the PROGRAM button on your device to begin flashing."
+
+		# Step 2: flash — -w waits for the bootloader to appear
+		task["stage"] = "flashing"
 		try:
 			proc = subprocess.Popen(
 				[str(loader_bin), "--mcu=TEENSY41", "-w", hex_path],
@@ -269,10 +274,10 @@ class FirmwareService:
 			else:
 				task.update({
 					"status": "error",
-					"error": f"teensy_loader_cli exited with code {proc.returncode}.",
+					"error": f"teensy_loader_cli exited with code {proc.returncode}.\n{task['output']}",
 				})
 		except subprocess.TimeoutExpired:
-			task.update({"status": "error", "error": "Flash timed out. Is the device in bootloader mode?"})
+			task.update({"status": "error", "error": "Flash timed out. Is the device plugged in?"})
 		except Exception as e:
 			task.update({"status": "error", "error": str(e)})
 
@@ -316,5 +321,6 @@ class FirmwareService:
 
 def _fetch_manifest() -> dict:
 	ctx = ssl.create_default_context(cafile=certifi.where())
-	with urllib.request.urlopen(FIRMWARE_MANIFEST_URL, timeout=10, context=ctx) as resp:
+	req = urllib.request.Request(FIRMWARE_MANIFEST_URL, headers={"User-Agent": "CassLogger"})
+	with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
 		return json.loads(resp.read())
