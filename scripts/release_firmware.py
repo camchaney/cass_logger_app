@@ -1,9 +1,11 @@
-"""Build all firmware variants and upload them to R2.
+"""Build firmware and upload it to R2.
+
+The firmware version is read automatically from the FW_VERSION define in main.cpp.
 
 Usage:
-    python scripts/release_firmware.py 0.09
-    python scripts/release_firmware.py 0.09 --changelog "Fixed IMU drift"
-    python scripts/release_firmware.py 0.09 --dry-run
+    python scripts/release_firmware.py
+    python scripts/release_firmware.py --changelog "Fixed IMU drift"
+    python scripts/release_firmware.py --dry-run
 
 Requires:
     pip install boto3
@@ -17,6 +19,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -25,18 +28,24 @@ from pathlib import Path
 
 # Firmware project is assumed to sit next to cass_logger_dev/
 FIRMWARE_DIR = Path(__file__).resolve().parent.parent.parent / "cassLogger"
+HEX_PATH     = FIRMWARE_DIR / ".pio" / "build" / "teensy41" / "firmware.hex"
 
-BUCKET       = "cass-logger-firmware"
-R2_ENDPOINT  = "https://3dcf54c93bec8bb69b6170a316c1c6a8.r2.cloudflarestorage.com"
-PUBLIC_BASE  = "https://YOUR_PUBLIC_URL"   # ← replace with R2 public URL or Worker URL
-
-VARIANTS = ["std", "i2c_1", "i2c_2"]
+BUCKET      = "cass-logger-firmware"
+R2_ENDPOINT = "https://3dcf54c93bec8bb69b6170a316c1c6a8.r2.cloudflarestorage.com"
+PUBLIC_BASE = "https://YOUR_PUBLIC_URL"  # ← replace with R2 public URL or Worker URL
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+def read_fw_version() -> str:
+	main_cpp = FIRMWARE_DIR / "src" / "main.cpp"
+	match = re.search(r'#define FW_VERSION\s+"([^"]+)"', main_cpp.read_text())
+	if not match:
+		print(f"Could not find FW_VERSION in {main_cpp}")
+		sys.exit(1)
+	return match.group(1)
+
 def sha256(path: Path) -> str:
 	return hashlib.sha256(path.read_bytes()).hexdigest()
-
 
 def require_env(name: str) -> str:
 	val = os.environ.get(name)
@@ -45,12 +54,10 @@ def require_env(name: str) -> str:
 		sys.exit(1)
 	return val
 
-
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main() -> None:
 	parser = argparse.ArgumentParser(description="Build and upload firmware to R2")
-	parser.add_argument("version", help="Firmware version string, e.g. 0.09")
 	parser.add_argument("--changelog", default="", help="Short release notes shown in the app")
 	parser.add_argument("--dry-run", action="store_true", help="Build only, skip upload")
 	args = parser.parse_args()
@@ -59,22 +66,21 @@ def main() -> None:
 		print(f"Firmware directory not found: {FIRMWARE_DIR}")
 		sys.exit(1)
 
-	# ── Build all environments ─────────────────────────────────────────────────
-	print(f"Building firmware v{args.version} ({', '.join(VARIANTS)})…")
+	version = read_fw_version()
+
+	# ── Build ──────────────────────────────────────────────────────────────────
+	print(f"Building firmware v{version}…")
 	result = subprocess.run(["pio", "run"], cwd=FIRMWARE_DIR)
 	if result.returncode != 0:
 		print("Build failed.")
 		sys.exit(1)
 
-	# ── Collect and verify hex files ───────────────────────────────────────────
-	hex_files: dict[str, Path] = {}
-	for variant in VARIANTS:
-		p = FIRMWARE_DIR / ".pio" / "build" / variant / "firmware.hex"
-		if not p.exists():
-			print(f"Missing build output: {p}")
-			sys.exit(1)
-		hex_files[variant] = p
-		print(f"  {variant}: {p.stat().st_size // 1024} KB  sha256={sha256(p)[:16]}…")
+	if not HEX_PATH.exists():
+		print(f"Hex file not found after build: {HEX_PATH}")
+		sys.exit(1)
+
+	checksum = sha256(HEX_PATH)
+	print(f"  {HEX_PATH.name}  {HEX_PATH.stat().st_size // 1024} KB  sha256={checksum[:16]}…")
 
 	if args.dry_run:
 		print("\nDry run — skipping upload.")
@@ -99,24 +105,23 @@ def main() -> None:
 		region_name="auto",
 	)
 
-	variants_meta: dict = {}
-	for variant, hex_path in hex_files.items():
-		key = f"firmware/{args.version}/{variant}.hex"
-		print(f"Uploading {key}…")
-		s3.upload_file(
-			str(hex_path), BUCKET, key,
-			ExtraArgs={"ContentType": "application/octet-stream"},
-		)
-		variants_meta[variant] = {
-			"url": f"{PUBLIC_BASE}/{key}",
-			"sha256": sha256(hex_path),
-		}
+	hex_key = f"firmware/{version}/firmware.hex"
+	print(f"Uploading {hex_key}…")
+	s3.upload_file(
+		str(HEX_PATH), BUCKET, hex_key,
+		ExtraArgs={"ContentType": "application/octet-stream"},
+	)
 
 	# ── Write and upload manifest ──────────────────────────────────────────────
 	manifest = {
-		"latest_version": args.version,
+		"latest_version": version,
 		"changelog": args.changelog,
-		"variants": variants_meta,
+		"variants": {
+			"std": {
+				"url": f"{PUBLIC_BASE}/{hex_key}",
+				"sha256": checksum,
+			}
+		},
 	}
 	manifest_json = json.dumps(manifest, indent=2)
 	print("Uploading firmware/manifest.json…")
@@ -127,9 +132,8 @@ def main() -> None:
 		ContentType="application/json",
 	)
 
-	print(f"\nDone. Firmware v{args.version} is live.")
+	print(f"\nDone. Firmware v{version} is live.")
 	print(manifest_json)
-
 
 if __name__ == "__main__":
 	main()
