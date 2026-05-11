@@ -19,6 +19,11 @@ function useMsg() {
 const isWindows = navigator.platform.startsWith('Win')
 const TEN_MONTHS_SEC = 10 * 30 * 24 * 60 * 60
 
+function fmtTime(unix: number) {
+	const d = new Date(unix * 1000)
+	return { local: d.toLocaleString(undefined, { timeZoneName: 'short' }), utc: d.toUTCString() }
+}
+
 export default function DevicePanel({ status, onConnected }: Props) {
 	const api = window.pywebview?.api
 
@@ -88,7 +93,7 @@ export default function DevicePanel({ status, onConnected }: Props) {
 		const computerUnix = Math.round((beforeMs + afterMs) / 2 / 1000)
 		setRtcInfo({
 			unix: deviceUnix,
-			datetime: new Date(deviceUnix * 1000).toUTCString(),
+			datetime: fmtTime(deviceUnix).local,
 			driftSec: deviceUnix - computerUnix,
 		})
 	}
@@ -347,6 +352,7 @@ export default function DevicePanel({ status, onConnected }: Props) {
 									<div style={{ marginBottom: 4 }}>
 										<span className="muted" style={{ fontSize: 12 }}>Device time </span>
 										<strong className="mono">{rtcInfo.datetime}</strong>
+										<span className="muted" style={{ fontSize: 12 }}> ({fmtTime(rtcInfo.unix).utc})</span>
 									</div>
 									<div>
 										<span className="muted" style={{ fontSize: 12 }}>Unix </span>
@@ -386,14 +392,14 @@ export default function DevicePanel({ status, onConnected }: Props) {
 							{rtcTsUnix !== null && (() => {
 								const ageSeconds = Math.floor(Date.now() / 1000) - rtcTsUnix
 								const ageMonths = ageSeconds / (30 * 24 * 60 * 60)
-								const dt = new Date(rtcTsUnix * 1000).toUTCString()
+								const { local, utc } = fmtTime(rtcTsUnix)
 								return (
 									<>
 										<div className="alert alert-info" style={{ marginBottom: 8 }}>
 											<span className="muted" style={{ fontSize: 12 }}>Installed </span>
-											<strong className="mono">{dt}</strong>
+											<strong className="mono">{local}</strong>
 											<span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
-												({ageMonths.toFixed(1)} months ago)
+												({utc}) · {ageMonths.toFixed(1)} months ago
 											</span>
 										</div>
 										{ageSeconds > TEN_MONTHS_SEC && (

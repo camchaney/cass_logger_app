@@ -76,7 +76,7 @@ export default function DataPanel() {
 		const sep = path.includes('\\') ? '\\' : '/'
 		const filename = path.split(/[\\/]/).pop() ?? ''
 		const tsMatch = filename.match(/(\d{9,11})\.bin$/i)
-		setRecordingStart(tsMatch ? new Date(parseInt(tsMatch[1], 10) * 1000).toUTCString() : null)
+		setRecordingStart(tsMatch ? new Date(parseInt(tsMatch[1], 10) * 1000).toLocaleString(undefined, { timeZoneName: 'short' }) : null)
 
 		// Extract directory (handles both / and \ separators)
 		const dir = path.substring(0, path.lastIndexOf(sep))

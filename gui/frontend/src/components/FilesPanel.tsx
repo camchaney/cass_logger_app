@@ -144,7 +144,7 @@ export default function FilesPanel({ connected }: Props) {
 								<tr>
 									<th>#</th>
 									<th>Filename</th>
-									<th>Recorded (UTC)</th>
+									<th>Recorded</th>
 									<th>Size</th>
 								</tr>
 							</thead>
@@ -152,7 +152,7 @@ export default function FilesPanel({ connected }: Props) {
 								{files.map((f, i) => {
 									const tsMatch = f.name.match(/(\d{9,11})\.bin$/i)
 									const recorded = tsMatch
-										? new Date(parseInt(tsMatch[1], 10) * 1000).toUTCString()
+										? new Date(parseInt(tsMatch[1], 10) * 1000).toLocaleString(undefined, { timeZoneName: 'short' })
 										: '—'
 									return (
 										<tr key={f.name}>
