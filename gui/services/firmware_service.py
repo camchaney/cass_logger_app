@@ -20,7 +20,7 @@ from gui.__version__ import VERSION as APP_VERSION
 # ── Configuration ──────────────────────────────────────────────────────────────
 
 # Public R2 URL for the firmware manifest. Replace with your actual bucket URL.
-FIRMWARE_MANIFEST_URL = "https://pub-a45f689de46443639322741c26449513.r2.dev/cass-logger-firmware/firmware/manifest.json"
+FIRMWARE_MANIFEST_URL = "https://firmware.casslabs.xyz/cass-logger-firmware/firmware/manifest.json"
 
 _APP_NAME = "CassLogger"
 _CACHE_DIR = Path(platformdirs.user_cache_dir(_APP_NAME))

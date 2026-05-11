@@ -33,7 +33,7 @@ PIO          = Path.home() / ".platformio" / "penv" / "bin" / "pio"
 
 BUCKET      = "cass-logger-firmware"
 R2_ENDPOINT = "https://3dcf54c93bec8bb69b6170a316c1c6a8.r2.cloudflarestorage.com/cass-logger-firmware"
-PUBLIC_BASE = "https://pub-a45f689de46443639322741c26449513.r2.dev/cass-logger-firmware"
+PUBLIC_BASE = "https://firmware.casslabs.xyz/cass-logger-firmware"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
