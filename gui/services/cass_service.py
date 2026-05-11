@@ -6,7 +6,7 @@ from typing import Optional
 
 import serial
 
-from src.cass_commands import CassCommands
+from cass_logger_dev.cass_commands import CassCommands
 
 
 class CassService:

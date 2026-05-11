@@ -16,7 +16,7 @@ a = Analysis(
     ['gui/app.py'],
     pathex=[],
     binaries=[],
-    datas=[('gui/frontend/dist', 'gui/frontend/dist'), ('src', 'src')] + _teensy_datas(),
+    datas=[('gui/frontend/dist', 'gui/frontend/dist')] + _teensy_datas(),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

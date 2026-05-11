@@ -3,16 +3,23 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cass-logger-dev"
+name = "cass-logger-app"
 version = "0.1.5"
-description = "Python package for interfacing with the Cass data logger"
+description = "Desktop GUI application for the Cass data logger"
 requires-python = ">=3.12"
 authors = [
-  { name = "Matt Morrison" }
+  { name = "Cameron Chaney" }
+]
+dependencies = [
+  "cass-logger-dev @ git+https://github.com/mcharlesmorrison/cass_logger_dev",
+  "pywebview>=5.0",
+  "pyinstaller>=6.0",
+  "platformdirs>=4.0",
+  "certifi>=2024.0",
 ]
 
 [project.urls]
-Repository = "https://github.com/mcharlesmorrison/cass_logger_dev"
+Repository = "https://github.com/camchaney/cass_logger_app"
 
 [tool.setuptools.packages.find]
 where = ["."]

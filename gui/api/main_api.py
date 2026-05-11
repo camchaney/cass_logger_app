@@ -14,7 +14,7 @@ import webview
 
 from gui.api._result import err, ok
 from gui.services.cass_service import CassService
-from src.cass_commands import CassCommands
+from cass_logger_dev.cass_commands import CassCommands
 
 
 class MainApi:
