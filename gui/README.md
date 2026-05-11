@@ -1,6 +1,6 @@
 # Cass Logger GUI
 
-Desktop app wrapping the `cass_logger_dev` CLI package via PyWebView + React.
+Desktop app wrapping the `cass_logger_app` CLI package via PyWebView + React.
 
 ## Prerequisites
 

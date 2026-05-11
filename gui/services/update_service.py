@@ -21,7 +21,7 @@ import platformdirs
 from gui.__version__ import VERSION
 
 MANIFEST_URL = (
-	"https://github.com/camchaney/cass_logger_dev"
+	"https://github.com/camchaney/cass_logger_app"
 	"/releases/latest/download/manifest.json"
 )
 _APP_NAME = "CassLogger"

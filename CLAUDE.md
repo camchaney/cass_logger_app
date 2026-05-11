@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**cass_logger_dev** is a desktop application for interfacing with the Cass Logger, a hardware data logger for suspension/IMU telemetry. The project has two layers:
+**cass_logger_app** is a desktop application for interfacing with the Cass Logger, a hardware data logger for suspension/IMU telemetry. The project has two layers:
 
 1. **CLI package** (`src/`) — standalone Python package for serial communication with the device; independently installable
 2. **GUI application** (`gui/`) — PyWebView + React desktop app that wraps the CLI

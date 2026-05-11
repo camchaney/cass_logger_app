@@ -44,7 +44,7 @@ The app must run natively on **macOS and Windows** as a standalone distributable
 | Cross-OS builds | **GitHub Actions** | Matrix build on `macos-latest` + `windows-latest` runners; PyInstaller can only build for the host OS |
 | Update + binary host (initial) | **GitHub Releases** | Free CDN, simple manifest hosting, fastest path to a working release pipeline |
 | Update + binary host (future) | **Cloudflare R2** | Migrate once stable; free egress, custom domain, consolidates with planned cloud sync infrastructure |
-| Underlying package | **`cass_logger_dev`** (this repo's `src/`) | Imported directly; already installable via `pyproject.toml` |
+| Underlying package | **`cass_logger_app`** (this repo's `src/`) | Imported directly; already installable via `pyproject.toml` |
 
 ### Why no inbound HTTP server / no FastAPI
 
@@ -59,7 +59,7 @@ The auto-update and future cloud sync features make **outbound** HTTP calls from
 The existing repo layout is preserved. The GUI is added under a dedicated top-level `gui/` directory so the separation between CLI and GUI is immediately obvious.
 
 ```
-cass_logger_dev/
+cass_logger_app/
 ├── src/                         # CLI package — UNCHANGED, independently usable
 ├── examples/                    # CLI usage examples — UNCHANGED
 ├── gui/                         # all GUI code lives here

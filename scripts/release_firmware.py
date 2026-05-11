@@ -26,7 +26,7 @@ from pathlib import Path
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 
-# Firmware project is assumed to sit next to cass_logger_dev/
+# Firmware project is assumed to sit next to cass_logger_app/
 FIRMWARE_DIR = Path(__file__).resolve().parent.parent.parent / "cassLogger"
 HEX_PATH     = FIRMWARE_DIR / ".pio" / "build" / "teensy41" / "firmware.hex"
 PIO          = Path.home() / ".platformio" / "penv" / "bin" / "pio"

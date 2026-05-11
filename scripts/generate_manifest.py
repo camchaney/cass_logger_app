@@ -8,7 +8,7 @@ all platform artifacts have been downloaded to ./artifacts/.
 
 Environment variables (set by the workflow):
   TAG   — the git tag, e.g. "v0.2.0"
-  REPO  — the GitHub repo slug, e.g. "camchaney/cass_logger_dev"
+  REPO  — the GitHub repo slug, e.g. "camchaney/cass_logger_app"
 """
 
 import json
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 TAG = os.environ.get("TAG", "")
-REPO = os.environ.get("REPO", "camchaney/cass_logger_dev")
+REPO = os.environ.get("REPO", "camchaney/cass_logger_app")
 
 if not TAG:
 	print("ERROR: TAG environment variable is not set", file=sys.stderr)
