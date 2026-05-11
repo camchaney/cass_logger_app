@@ -31,8 +31,8 @@ FIRMWARE_DIR = Path(__file__).resolve().parent.parent.parent / "cassLogger"
 HEX_PATH     = FIRMWARE_DIR / ".pio" / "build" / "teensy41" / "firmware.hex"
 
 BUCKET      = "cass-logger-firmware"
-R2_ENDPOINT = "https://3dcf54c93bec8bb69b6170a316c1c6a8.r2.cloudflarestorage.com"
-PUBLIC_BASE = "https://YOUR_PUBLIC_URL"  # ← replace with R2 public URL or Worker URL
+R2_ENDPOINT = "https://3dcf54c93bec8bb69b6170a316c1c6a8.r2.cloudflarestorage.com/cass-logger-firmware"
+PUBLIC_BASE = "https://pub-a45f689de46443639322741c26449513.r2.dev/cass-logger-firmware"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
