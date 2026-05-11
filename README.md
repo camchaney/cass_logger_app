@@ -1,80 +1,103 @@
-# 🚀 cass_logger_app 🚀
+# Cass Logger App
 
-Simple Python package for developers to interface with the Cass Logger. This package allows users to perform simple operations on the logger and download/process data.
+Desktop application for the [Cass Logger](https://github.com/mcharlesmorrison/cass_logger_dev) — a hardware data logger for suspension/IMU telemetry. Built with PyWebView + React.
 
-> **Platform support:** macOS, Linux, and Windows support (Windows is less tested)!
+> **Platform support:** macOS and Windows
 
-## 🛠️ How to Use
+---
 
-1. Create a virtual environment:
+## Setup
 
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows use: venv\Scripts\activate
+**Prerequisites:** Python ≥ 3.12, Node.js ≥ 18
 
-2. Install required dependencies:
+```bash
+# Python deps (installs cass-logger-dev from GitHub + GUI deps)
+pip install -e .
 
-   ```bash
-   pip install -r requirements.txt
-
-3. Explore usage examples in the `examples/` folder — you’ll find scripts you can run to interact with the logger and test functionality:
-
-   | Script | Description |
-   |--------|-------------|
-   | `examples/load_and_plot_ex.py` | Load a pre-downloaded `.bin` file from `examples/data/` and plot potentiometer (fork/shock) data |
-   | `examples/download_and_plot_ex.py` | Download data from a connected device, then plot internal IMU (accelerometer) data |
-
-   ```bash
-   python3 examples/load_and_plot_ex.py
-   python3 examples/download_and_plot_ex.py
-   ```
-
-## 📋 Logger Operations
-
-All operations are available through `CassCommands` in `src/cass_commands.py`. Serial ports are opened automatically on first use.
-
-```python
-from src.cass_commands import CassCommands
-cass_utils = CassCommands()
+# Frontend deps
+cd gui/frontend && npm install
 ```
 
-### Serial Port Management
+---
 
-| Operation | Method | Description |
-|-----------|--------|-------------|
-| Auto-detect ports | `cass_utils.get_serial_ports()` | Find the two logger serial ports automatically |
-| Manual port setup | `cass_utils.set_manual_serial_ports(data, cmd)` | Manually specify ports if auto-detection fails |
-| List available ports | `cass_utils.list_available_ports()` | Show all available serial ports for manual selection |
-| Windows diagnostics | `cass_utils.diagnose_windows_ports()` | Windows-specific tool to identify potential logger ports |
+## Development
 
-### File Management
+```bash
+# Terminal 1 — Vite dev server (hot reload)
+cd gui/frontend && npm run dev
 
-| Operation | Method | Description |
-|-----------|--------|-------------|
-| List files | `cass_utils.list_files()` | Returns filenames stored on the device SD card |
-| List file sizes | `cass_utils.list_file_sizes()` | Returns file sizes in bytes, in the same order as `list_files()` |
-| Read single file | `cass_utils.read_file(filename, file_size)` | Download a single file from the device as raw bytes |
-| Write bytes to file | `cass_utils.bytes_to_file(bytes, filename, dir)` | Write raw bytes to a local file, creating the directory if needed |
-| Download all | `cass_utils.download_all()` | Downloads all files to a timestamped local directory and writes a `metadata.txt` |
-| Delete all | `cass_utils.delete_all_files()` | Deletes all files from the SD card (pass `prompt_user=True` to confirm first) |
+# Terminal 2 — PyWebView host pointing at Vite
+DEV=1 python gui/app.py
 
-### Data Processing
+# Windows (PowerShell)
+$env:DEV = "1"; python gui/app.py
+```
 
-| Operation | Method | Description |
-|-----------|--------|-------------|
-| Parse binary file | `CassCommands.process_data_file(path)` | Parses a `.bin` file into a pandas DataFrame with a `t` (seconds) column. Pass `fw_ver` if using an I2C firmware variant |
-| Parse FIT file | `CassCommands.process_fit_file(dir, filename)` | Parses a `.fit` file into `(df_session, df_record)` DataFrames |
-| Handle timestamp rollover | `CassCommands.handle_tmicros_rollover(col)` | Reconstructs a monotonic timestamp column from a rolled-over microsecond counter |
-| Find metadata | `CassCommands.find_and_parse_metadata(dir)` | Searches a directory for `metadata.txt` and returns firmware version and device ID |
+## Production build
 
-### Device Configuration
+```bash
+cd gui/frontend && npm run build   # outputs to gui/frontend/dist/
+python gui/app.py                  # loads from gui/frontend/dist/
+```
 
-| Operation | Method | Description |
-|-----------|--------|-------------|
-| Set RTC time | `cass_utils.set_RTC_time()` | Syncs the device RTC to the current UTC time |
-| Get RTC time | `cass_utils.get_RTC_time()` | Reads the current RTC time from the device |
-| Get firmware version | `cass_utils.get_fw_ver()` | Returns the firmware version string (e.g. `"std"`, `"i2c_1"`, `"i2c_2"`) |
-| Get device ID | `cass_utils.get_device_ID()` | Reads the device identifier stored in EEPROM |
-| Set device ID | `cass_utils.put_device_ID(id)` | Writes a device identifier string to EEPROM |
-| Get RTC install time | `cass_utils.get_rtc_install_timestamp()` | Reads the RTC battery install timestamp from EEPROM |
-| Set RTC install time | `cass_utils.put_rtc_install_timestamp()` | Writes the RTC battery install timestamp to EEPROM (defaults to now) |
+---
+
+## Releasing a new app version
+
+1. **Bump the version** in three places:
+
+   | File | Field |
+   |------|-------|
+   | `gui/__version__.py` | `VERSION = "x.y.z"` |
+   | `pyproject.toml` | `version = "x.y.z"` |
+   | `gui/frontend/package.json` | `"version": "x.y.z"` |
+
+   > `CassLogger.iss` (Windows installer) gets the version injected from the git tag by CI — no manual edit needed.
+
+   Tip: search the codebase for the current version string to find all three locations quickly.
+
+2. **Commit and tag**:
+   ```bash
+   git add gui/__version__.py pyproject.toml gui/frontend/package.json
+   git commit -m "Bump version to x.y.z"
+   git tag vx.y.z
+   git push origin main --tags
+   ```
+
+GitHub Actions triggers on the tag, builds macOS (DMG) and Windows (installer) artifacts, and publishes a GitHub release automatically.
+
+## Releasing new firmware
+
+Requires `pip install boto3` and R2 credentials in the environment.
+
+```bash
+python scripts/release_firmware.py --changelog "Short description of changes"
+```
+
+This builds the firmware via PlatformIO, uploads the `.hex` to R2 as `{version}/logger-firmware_{version}_std.hex`, and updates the manifest at `https://firmware.casslabs.xyz/manifest.json`. The app picks up the new version on next launch.
+
+---
+
+## Architecture
+
+```
+gui/
+├── app.py               # Entry point — creates PyWebView window, loads frontend
+├── __version__.py       # App version string (bump before tagging a release)
+├── api/
+│   ├── main_api.py      # Flat API class exposed to JS via window.pywebview.api.*
+│   └── _result.py       # ok() / err() result helpers
+├── services/
+│   ├── cass_service.py      # Singleton wrapper around CassCommands
+│   ├── firmware_service.py  # Firmware manifest fetch, download, and flash
+│   └── update_service.py    # App auto-update logic
+└── frontend/            # React + Vite TypeScript app
+    └── src/
+        ├── App.tsx
+        ├── types.ts     # PyWebView API type declarations
+        └── components/
+```
+
+The CLI package (`cass-logger-dev`) is imported as a dependency — never modified here. The GUI calls it via `CassService`, which wraps `CassCommands` as a singleton and manages connection state.
+
+PyWebView provides a direct Python ↔ JS bridge — there is no HTTP server. The frontend calls `window.pywebview.api.method_name()` directly.
