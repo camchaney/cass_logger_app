@@ -4,14 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**cass_logger_app** is a desktop application for interfacing with the Cass Logger, a hardware data logger for suspension/IMU telemetry. The project has two layers:
+**cass_logger_app** is a PyWebView + React desktop application for interfacing with the Cass Logger, a hardware data logger for suspension/IMU telemetry.
 
-1. **CLI package** (`src/`) — standalone Python package for serial communication with the device; independently installable
-2. **GUI application** (`gui/`) — PyWebView + React desktop app that wraps the CLI
+The CLI package (`cass-logger-dev`) is an external dependency installed from [github.com/mcharlesmorrison/cass_logger_dev](https://github.com/mcharlesmorrison/cass_logger_dev) — never modify it here.
 
 ## Commands
 
-### GUI Development
+### Setup
+
+```bash
+pip install -e .                  # install Python deps including cass-logger-dev
+cd gui/frontend && npm install    # install frontend deps
+```
+
+### Development
 
 ```bash
 # Terminal 1 — React dev server (hot reload on http://localhost:5173)
@@ -21,29 +27,19 @@ cd gui/frontend && npm run dev
 DEV=1 python gui/app.py
 ```
 
-### GUI Production
+### Production
 
 ```bash
-# Build React frontend
-cd gui/frontend && npm run build
-
-# Run with bundled frontend
-python gui/app.py
-```
-
-### Frontend Type Checking / Linting
-
-```bash
-cd gui/frontend && npm run build  # tsc + vite build; catches type errors
+cd gui/frontend && npm run build  # tsc + vite build; also catches type errors
+python gui/app.py                 # loads from gui/frontend/dist/
 ```
 
 ### Packaging (PyInstaller)
 
+Use `CassLogger.spec` — do not pass `--add-data` manually:
+
 ```bash
-pyinstaller --name CassLogger --windowed \
-  --add-data "gui/frontend/dist:gui/frontend/dist" \
-  --add-data "src:src" \
-  gui/app.py
+pyinstaller CassLogger.spec
 ```
 
 ## Architecture
@@ -60,14 +56,14 @@ PyWebView provides a direct Python ↔ JS bridge — there is **no HTTP server**
 | `gui/api/main_api.py` | ~30 methods exposed to the JS bridge |
 | `gui/api/_result.py` | `ok(data)` / `err(msg)` helpers — all API methods return `{"ok": bool, "data": ..., "error": ...}` |
 | `gui/services/cass_service.py` | Singleton wrapping `CassCommands`; manages connection state, health polling, caching |
+| `gui/services/firmware_service.py` | Firmware manifest fetch, download, and flash via teensy_loader_cli |
+| `gui/services/update_service.py` | App auto-update: manifest fetch, installer download, launch |
 | `gui/frontend/src/types.ts` | TypeScript interfaces + `PyApi` declaration of the bridge API |
 | `gui/frontend/src/App.tsx` | Tab navigation, status header, 5-second poll loop, auto-reconnect logic |
-| `src/cass_commands.py` | Core serial protocol, file ops, binary/FIT data parsing |
-| `src/firmware_structs.py` | NumPy dtype definitions for firmware variants (`std`, `i2c_1`, `i2c_2`) |
 
 ### Data Flow for Long-Running Operations
 
-File downloads run on background threads. The API method starts the thread and returns a `task_id` immediately; the frontend polls `get_task_status(task_id)` every ~1 second. Task state is stored in `self._tasks[task_id]` with a `threading.Lock()`.
+File downloads and firmware flashing run on background threads. The API method starts the thread and returns a `task_id` immediately; the frontend polls `get_task_status(task_id)` every ~1 second. Task state is stored in `self._tasks[task_id]` with a `threading.Lock()`.
 
 ### Adding New Device Controls
 
@@ -90,7 +86,7 @@ File downloads run on background threads. The API method starts the thread and r
 
 ## Important Constraints
 
-- `src/` is a standalone CLI package — the GUI imports it but never modifies it
+- `cass-logger-dev` is a read-only external dependency — never copy or vendor its source here
 - Only one device connection at a time (`CassService` is a singleton)
 - Serial ports are opened lazily per command and closed after each operation (macOS/Windows compatibility)
 - `manuallyDisconnectedRef` in `App.tsx` prevents auto-reconnect after an explicit disconnect
