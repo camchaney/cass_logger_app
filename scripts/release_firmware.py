@@ -32,7 +32,7 @@ HEX_PATH     = FIRMWARE_DIR / ".pio" / "build" / "teensy41" / "firmware.hex"
 PIO          = Path.home() / ".platformio" / "penv" / "bin" / "pio"
 
 BUCKET      = "cass-logger-firmware"
-R2_ENDPOINT = "https://3dcf54c93bec8bb69b6170a316c1c6a8.r2.cloudflarestorage.com/cass-logger-firmware"
+R2_ENDPOINT = "https://3dcf54c93bec8bb69b6170a316c1c6a8.r2.cloudflarestorage.com"
 PUBLIC_BASE = "https://firmware.casslabs.xyz"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -106,7 +106,9 @@ def main() -> None:
 		region_name="auto",
 	)
 
-	hex_key = f"firmware/{version}/firmware.hex"
+	variant = "std"			# single vairant for now
+	hex_name = f"logger-firmware_{version}_{variant}.hex"
+	hex_key = f"{version}/{hex_name}"
 	print(f"Uploading {hex_key}…")
 	s3.upload_file(
 		str(HEX_PATH), BUCKET, hex_key,
@@ -118,17 +120,17 @@ def main() -> None:
 		"latest_version": version,
 		"changelog": args.changelog,
 		"variants": {
-			"std": {
+			variant: {
 				"url": f"{PUBLIC_BASE}/{hex_key}",
 				"sha256": checksum,
 			}
 		},
 	}
 	manifest_json = json.dumps(manifest, indent=2)
-	print("Uploading firmware/manifest.json…")
+	print("Uploading manifest.json…")
 	s3.put_object(
 		Bucket=BUCKET,
-		Key="firmware/manifest.json",
+		Key="manifest.json",
 		Body=manifest_json.encode(),
 		ContentType="application/json",
 	)
