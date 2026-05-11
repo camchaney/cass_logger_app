@@ -143,7 +143,7 @@ class UpdateService:
 		except Exception:
 			pass
 		threading.Thread(
-			target=lambda: (time.sleep(1.5), sys.exit(0)),
+			target=lambda: (time.sleep(1.5), os._exit(0)),
 			daemon=True,
 		).start()
 		return True

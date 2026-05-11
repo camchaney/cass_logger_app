@@ -52,10 +52,12 @@ export default function UpdateBanner({ updateState, onDismiss, onSkip }: Props) 
 
 	const progressBar = dlStatus && dlStatus.status === 'running' && (
 		<div className="update-progress-wrap">
-			<div
-				className="update-progress-bar"
-				style={{ width: `${Math.round(dlStatus.progress * 100)}%` }}
-			/>
+			<div className="update-progress-track">
+				<div
+					className="update-progress-bar"
+					style={{ width: `${Math.round(dlStatus.progress * 100)}%` }}
+				/>
+			</div>
 			<span className="update-progress-text">
 				{dlStatus.total_bytes
 					? `${(dlStatus.downloaded_bytes / 1024 / 1024).toFixed(1)} / ${(dlStatus.total_bytes / 1024 / 1024).toFixed(1)} MB`
