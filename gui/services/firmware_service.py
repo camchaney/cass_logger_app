@@ -268,7 +268,7 @@ class FirmwareService:
 				proc.communicate()
 				task.update({
 					"status": "error",
-					"error": "Flash timed out. Press the PROGRAM button on the logger to enter bootloader mode manually.",
+					"error": "Flash timed out. Re-connect logger and try again.",
 				})
 				return
 

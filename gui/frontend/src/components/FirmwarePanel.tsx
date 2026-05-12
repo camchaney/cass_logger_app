@@ -290,7 +290,7 @@ export default function FirmwarePanel({ status }: Props) {
 							{rtcSyncMsg}
 						</div>
 					)}
-					<button className="btn btn-secondary" onClick={handleReset}>Done</button>
+					<button className="btn btn-secondary" onClick={handleReset} disabled={pendingRtcSync || rtcSyncing}>Done</button>
 				</div>
 			)}
 
