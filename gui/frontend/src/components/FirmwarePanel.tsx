@@ -19,6 +19,9 @@ export default function FirmwarePanel({ status }: Props) {
 	const [flashStatus, setFlashStatus] = useState<FirmwareFlashStatus | null>(null)
 	const [downloadTaskId, setDownloadTaskId] = useState<string | null>(null)
 	const [flashTaskId, setFlashTaskId] = useState<string | null>(null)
+	const [pendingRtcSync, setPendingRtcSync] = useState(false)
+	const [rtcSyncing, setRtcSyncing] = useState(false)
+	const [rtcSyncMsg, setRtcSyncMsg] = useState<string | null>(null)
 	const dlPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 	const flashPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -74,6 +77,7 @@ export default function FirmwarePanel({ status }: Props) {
 			if (res.data.status === 'done') {
 				if (flashPollRef.current) clearInterval(flashPollRef.current)
 				setFlowStep('done')
+				setPendingRtcSync(true)
 			} else if (res.data.status === 'error') {
 				if (flashPollRef.current) clearInterval(flashPollRef.current)
 				setFlowStep('error')
@@ -81,6 +85,17 @@ export default function FirmwarePanel({ status }: Props) {
 		}, 500)
 		return () => { if (flashPollRef.current) clearInterval(flashPollRef.current) }
 	}, [flashTaskId, api])
+
+	// Auto-sync RTC once device reconnects after a successful flash
+	useEffect(() => {
+		if (!pendingRtcSync || !status.connected || !api) return
+		setPendingRtcSync(false)
+		setRtcSyncing(true)
+		api.set_rtc_time().then(res => {
+			setRtcSyncing(false)
+			setRtcSyncMsg(res.ok ? 'RTC synced to current time.' : `RTC sync failed: ${res.error}`)
+		})
+	}, [pendingRtcSync, status.connected, api])
 
 	const startFlash = useCallback(async (dlTaskId: string) => {
 		if (!api) return
@@ -114,6 +129,9 @@ export default function FirmwarePanel({ status }: Props) {
 		setFlashStatus(null)
 		setDownloadTaskId(null)
 		setFlashTaskId(null)
+		setPendingRtcSync(false)
+		setRtcSyncing(false)
+		setRtcSyncMsg(null)
 	}
 
 	const updateAvailable = fwState?.latest_version != null
@@ -177,7 +195,7 @@ export default function FirmwarePanel({ status }: Props) {
 						<button
 							className="btn btn-primary"
 							onClick={handleUpdate}
-							disabled={!updateAvailable}
+							disabled={!updateAvailable || !status.connected}
 						>
 							{fwState?.state === 'unknown' ? 'Checking…' : `Flash v${fwState?.latest_version ?? '…'}`}
 						</button>
@@ -245,6 +263,16 @@ export default function FirmwarePanel({ status }: Props) {
 					<div className="alert alert-success" style={{ marginBottom: 12 }}>
 						Firmware flashed successfully. The device is rebooting.
 					</div>
+					{rtcSyncing && (
+						<div className="row muted" style={{ fontSize: 13, marginBottom: 12 }}>
+							<span className="spinner spinner-dark" /> Waiting for device to reconnect to sync RTC…
+						</div>
+					)}
+					{rtcSyncMsg && (
+						<div className={`alert ${rtcSyncMsg.startsWith('RTC synced') ? 'alert-success' : 'alert-warning'}`} style={{ marginBottom: 12 }}>
+							{rtcSyncMsg}
+						</div>
+					)}
 					<button className="btn btn-secondary" onClick={handleReset}>Done</button>
 				</div>
 			)}
