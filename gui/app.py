@@ -12,14 +12,6 @@ if str(ROOT) not in sys.path:
 # When frozen by PyInstaller, data files are unpacked into sys._MEIPASS.
 BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", ROOT))
 
-# cass_commands.py in the parent package uses `from src.firmware_structs import …`
-# (a legacy import path). Shim `src` → `cass_logger_dev` so it resolves correctly
-# both in dev and in the PyInstaller bundle.
-import cass_logger_dev
-import cass_logger_dev.firmware_structs
-sys.modules.setdefault("src", cass_logger_dev)
-sys.modules.setdefault("src.firmware_structs", cass_logger_dev.firmware_structs)
-
 import webview
 
 from gui.api.main_api import MainApi
