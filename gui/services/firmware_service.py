@@ -7,6 +7,7 @@ import ssl
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
 import uuid
 from pathlib import Path
@@ -226,32 +227,24 @@ class FirmwareService:
 
 	def _run_flash(self, flash_id: str, hex_path: str, variant: str) -> None:
 		task = self._flashes[flash_id]
-		reboot_bin = _tool("teensy_reboot")
 		loader_bin = _tool("teensy_loader_cli")
 
-		for b in (reboot_bin, loader_bin):
-			if b.exists() and platform.system() != "Windows":
-				b.chmod(b.stat().st_mode | 0o111)
+		if loader_bin.exists() and platform.system() != "Windows":
+			loader_bin.chmod(loader_bin.stat().st_mode | 0o111)
 
 		if not loader_bin.exists():
 			task.update({
 				"status": "error",
-				"error": f"teensy_loader_cli not found. Run: brew install teensy_loader_cli",
+				"error": "teensy_loader_cli not found. Run: brew install teensy_loader_cli",
 			})
 			return
 
-		# Step 1: trigger bootloader via teensy_reboot (stage stays "rebooting")
-		task["output"] = "Rebooting device into bootloader…"
-		if reboot_bin.exists():
-			try:
-				subprocess.run([str(reboot_bin)], timeout=10, capture_output=True)
-			except Exception:
-				pass
-		else:
-			task["output"] = "Press the PROGRAM button on your device to begin flashing."
+		# The 134-baud CDC trigger in main_api.py has already told the device
+		# to enter bootloader mode. -w waits for HalfKay to appear on USB.
+		task["stage"] = "rebooting"
+		task["output"] = "Waiting for bootloader…"
 
-		# Step 2: flash — -w waits for the bootloader to appear
-		task["stage"] = "flashing"
+		FLASH_TIMEOUT = 30
 		try:
 			proc = subprocess.Popen(
 				[str(loader_bin), "--mcu=TEENSY41", "-w", hex_path],
@@ -259,25 +252,38 @@ class FirmwareService:
 				stderr=subprocess.STDOUT,
 				text=True,
 			)
-			lines: list[str] = []
-			assert proc.stdout is not None
-			for line in proc.stdout:
-				line = line.rstrip()
-				if line:
-					lines.append(line)
-					task["output"] = "\n".join(lines[-8:])
-			proc.wait(timeout=120)
+
+			# Advance the stage display after a few seconds so the UI transitions
+			# from "Rebooting…" to "Writing firmware…"
+			def _advance_stage() -> None:
+				time.sleep(4)
+				if task["status"] == "running":
+					task["stage"] = "flashing"
+			threading.Thread(target=_advance_stage, daemon=True).start()
+
+			try:
+				stdout, _ = proc.communicate(timeout=FLASH_TIMEOUT)
+			except subprocess.TimeoutExpired:
+				proc.kill()
+				proc.communicate()
+				task.update({
+					"status": "error",
+					"error": "Flash timed out. Press the PROGRAM button on the logger to enter bootloader mode manually.",
+				})
+				return
+
+			output = stdout.strip()
+			task["output"] = "\n".join(output.splitlines()[-8:]) if output else ""
 
 			if proc.returncode == 0:
 				task.update({"status": "done", "stage": "done"})
 				self._save_installed_version(variant)
 			else:
+				last_line = output.splitlines()[-1] if output else "Error writing to Teensy"
 				task.update({
 					"status": "error",
-					"error": f"teensy_loader_cli exited with code {proc.returncode}.\n{task['output']}",
+					"error": f"teensy_loader_cli exited with code {proc.returncode}. {last_line}",
 				})
-		except subprocess.TimeoutExpired:
-			task.update({"status": "error", "error": "Flash timed out. Is the device plugged in?"})
 		except Exception as e:
 			task.update({"status": "error", "error": str(e)})
 

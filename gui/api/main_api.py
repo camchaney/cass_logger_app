@@ -394,8 +394,30 @@ class MainApi:
 		return ok(status) if status is not None else err("Unknown firmware download task ID")
 
 	def start_firmware_flash(self, download_task_id: str, variant: str) -> dict:
-		"""Disconnect serial, then flash. The app's poll loop will auto-reconnect after."""
+		"""Trigger bootloader entry, disconnect serial, then flash."""
+		# Capture data port name before disconnecting so we can send the
+		# 134-baud CDC bootloader trigger after releasing the port.
+		data_port: Optional[str] = None
+		try:
+			if self._svc._cass is not None:
+				ser = self._svc._cass._ser_data
+				if ser is not None:
+					data_port = ser.port
+		except Exception:
+			pass
+
 		self._svc.disconnect()
+
+		# Teensyduino's USB CDC driver calls _reboot_Teensyduino_() when the
+		# host sets baud=134, entering HalfKay bootloader mode.
+		if data_port:
+			try:
+				import serial as _serial_lib
+				s = _serial_lib.Serial(data_port, 134)
+				s.close()
+			except Exception:
+				pass
+
 		from gui.services.firmware_service import FirmwareService
 		flash_id = FirmwareService().start_flash(download_task_id, variant)
 		return ok(flash_id)

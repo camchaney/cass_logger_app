@@ -24,6 +24,7 @@ export default function FirmwarePanel({ status }: Props) {
 	const [rtcSyncMsg, setRtcSyncMsg] = useState<string | null>(null)
 	const dlPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 	const flashPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+	const rtcSyncInProgressRef = useRef(false)
 
 	// Default to first available variant from manifest once loaded
 	useEffect(() => {
@@ -86,15 +87,31 @@ export default function FirmwarePanel({ status }: Props) {
 		return () => { if (flashPollRef.current) clearInterval(flashPollRef.current) }
 	}, [flashTaskId, api])
 
-	// Auto-sync RTC once device reconnects after a successful flash
+	// Auto-sync RTC once device reconnects after a successful flash.
+	// Uses a ref to prevent concurrent calls — state-based guards would re-trigger
+	// the effect and potentially loop. Waits 3 s after connect so the device has
+	// time to fully boot before we send a serial command. Retries once if the
+	// first attempt fails with a "not connected" error (race with App.tsx's
+	// check_alive poll calling disconnect() between our get_status and set_rtc_time).
 	useEffect(() => {
-		if (!pendingRtcSync || !status.connected || !api) return
-		setPendingRtcSync(false)
+		if (!pendingRtcSync || !status.connected || rtcSyncInProgressRef.current || !api) return
+		rtcSyncInProgressRef.current = true
 		setRtcSyncing(true)
-		api.set_rtc_time().then(res => {
+		const doSync = async () => {
+			// Stabilisation delay — device may have just come back from reboot
+			await new Promise(res => setTimeout(res, 3000))
+			let res = await api.set_rtc_time()
+			if (!res.ok && res.error?.toLowerCase().includes('not connected')) {
+				// Race with the status poll — wait a bit and retry once
+				await new Promise(r => setTimeout(r, 3000))
+				res = await api.set_rtc_time()
+			}
+			rtcSyncInProgressRef.current = false
 			setRtcSyncing(false)
+			setPendingRtcSync(false)
 			setRtcSyncMsg(res.ok ? 'RTC synced to current time.' : `RTC sync failed: ${res.error}`)
-		})
+		}
+		doSync()
 	}, [pendingRtcSync, status.connected, api])
 
 	const startFlash = useCallback(async (dlTaskId: string) => {
