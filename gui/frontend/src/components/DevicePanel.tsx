@@ -47,6 +47,7 @@ export default function DevicePanel({ status, onConnected }: Props) {
 
 	const rtcTs = useMsg()
 	const [rtcTsUnix, setRtcTsUnix] = useState<number | null>(null)
+	const [confirmRtcTs, setConfirmRtcTs] = useState(false)
 
 	const devId = useMsg()
 	const [devIdVal, setDevIdVal] = useState<string | null>(null)
@@ -384,8 +385,15 @@ export default function DevicePanel({ status, onConnected }: Props) {
 							</div>
 							<div className="row" style={{ marginBottom: 8 }}>
 								<button className="btn btn-secondary" onClick={getRtcTs}>Read</button>
-								<button className="btn btn-primary" onClick={putRtcTs}>Set to Now</button>
+								<button className="btn btn-primary" onClick={() => setConfirmRtcTs(true)}>Set to Now</button>
 							</div>
+							{confirmRtcTs && (
+								<div className="alert alert-warning" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+									<span>Are you sure you want to update the RTC install time? Only do this if you just replaced the battery!</span>
+									<button className="btn btn-primary" style={{ flexShrink: 0 }} onClick={() => { setConfirmRtcTs(false); putRtcTs() }}>Yes, update</button>
+									<button className="btn btn-secondary" style={{ flexShrink: 0 }} onClick={() => setConfirmRtcTs(false)}>Cancel</button>
+								</div>
+							)}
 
 							{rtcTsUnix !== null && (() => {
 								const ageSeconds = Math.floor(Date.now() / 1000) - rtcTsUnix
