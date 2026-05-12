@@ -32,6 +32,17 @@ export interface TaskStatus {
 	error: string | null
 }
 
+export interface BinFileEntry {
+	name: string
+	size: number
+	path: string
+}
+
+export interface ExportAllResult {
+	csv_dir: string
+	results: { name: string; ok: boolean; path?: string; error?: string }[]
+}
+
 export interface BinParseResult {
 	columns: string[]
 	rows: number
@@ -133,7 +144,10 @@ export interface PyApi {
 	get_task_status(task_id: string): Promise<ApiResult<TaskStatus>>
 	delete_all_files(): Promise<ApiResult<string>>
 	// Data
+	list_bin_files(dir_path: string): Promise<ApiResult<BinFileEntry[]>>
 	parse_bin(path: string, fw_ver: string): Promise<ApiResult<BinParseResult>>
+	export_bin_csv(bin_path: string): Promise<ApiResult<string>>
+	export_all_bin_csv(dir_path: string, fw_ver: string): Promise<ApiResult<ExportAllResult>>
 	parse_fit(path: string): Promise<ApiResult<FitParseResult>>
 	export_csv(source: string, dest_path: string): Promise<ApiResult<string>>
 	find_metadata(dir_path: string): Promise<ApiResult<MetadataResult>>

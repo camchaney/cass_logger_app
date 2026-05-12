@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import InfoTip from './InfoTip'
+import type { BinFileEntry, ExportAllResult } from '../types'
 import {
 	CartesianGrid,
 	Line,
@@ -39,13 +40,17 @@ export default function DataPanel() {
 	const [subTab, setSubTab] = useState<SubTab>('bin')
 
 	// ── .bin state ─────────────────────────────────────────────────────────────
-	const [binPath, setBinPath] = useState<string | null>(null)
-	const [recordingStart, setRecordingStart] = useState<string | null>(null)
+	const [binDir, setBinDir] = useState<string | null>(null)
+	const [binFiles, setBinFiles] = useState<BinFileEntry[]>([])
+	const [selectedBin, setSelectedBin] = useState<BinFileEntry | null>(null)
 	const [fwVer, setFwVer] = useState('std')
 	const [fwVerSource, setFwVerSource] = useState<'metadata' | 'default' | null>(null)
 	const [binResult, setBinResult] = useState<BinParseResult | null>(null)
 	const [binError, setBinError] = useState<string | null>(null)
 	const [binLoading, setBinLoading] = useState(false)
+	const [exportMsg, setExportMsg] = useState<{ ok: boolean; text: string } | null>(null)
+	const [exportAllResult, setExportAllResult] = useState<ExportAllResult | null>(null)
+	const [exportAllLoading, setExportAllLoading] = useState(false)
 	const [chartSection, setChartSection] = useState<'imu' | 'channels'>('imu')
 	const [imuGroupKey, setImuGroupKey] = useState('g')
 	const [channelLetter, setChannelLetter] = useState('a')
@@ -64,23 +69,28 @@ export default function DataPanel() {
 
 	// ── .bin handlers ──────────────────────────────────────────────────────────
 
-	const pickBin = async () => {
+	const fmtBinTime = (name: string) => {
+		const match = name.match(/(\d{9,11})\.bin$/i)
+		if (!match) return null
+		return new Date(parseInt(match[1], 10) * 1000).toLocaleString(undefined, { timeZoneName: 'short' })
+	}
+
+	const pickBinDir = async () => {
 		if (!api) return
-		const res = await api.pick_file(['Binary files (*.bin)', 'All files (*.*)'])
+		const res = await api.pick_directory()
 		if (!res.ok || !res.data) return
-		const path = res.data
-		setBinPath(path)
+		const dir = res.data
+		setBinDir(dir)
+		setSelectedBin(null)
 		setBinResult(null)
 		setBinError(null)
-
-		const sep = path.includes('\\') ? '\\' : '/'
-		const filename = path.split(/[\\/]/).pop() ?? ''
-		const tsMatch = filename.match(/(\d{9,11})\.bin$/i)
-		setRecordingStart(tsMatch ? new Date(parseInt(tsMatch[1], 10) * 1000).toLocaleString(undefined, { timeZoneName: 'short' }) : null)
-
-		// Extract directory (handles both / and \ separators)
-		const dir = path.substring(0, path.lastIndexOf(sep))
-		const metaRes = await api.find_metadata(dir)
+		setExportMsg(null)
+		setExportAllResult(null)
+		const [filesRes, metaRes] = await Promise.all([
+			api.list_bin_files(dir),
+			api.find_metadata(dir),
+		])
+		if (filesRes.ok && filesRes.data) setBinFiles(filesRes.data)
 		if (metaRes.ok && metaRes.data?.firmware_version) {
 			setFwVer(metaRes.data.firmware_version as string)
 			setFwVerSource('metadata')
@@ -90,12 +100,14 @@ export default function DataPanel() {
 		}
 	}
 
-	const parseBin = async () => {
-		if (!api || !binPath) return
-		setBinLoading(true)
-		setBinError(null)
+	const selectBin = async (file: BinFileEntry) => {
+		if (!api) return
+		setSelectedBin(file)
 		setBinResult(null)
-		const res = await api.parse_bin(binPath, fwVer)
+		setBinError(null)
+		setExportMsg(null)
+		setBinLoading(true)
+		const res = await api.parse_bin(file.path, fwVer)
 		if (res.ok && res.data) {
 			setBinResult(res.data)
 			const cols = res.data.columns
@@ -109,12 +121,23 @@ export default function DataPanel() {
 		setBinLoading(false)
 	}
 
-	const exportBin = async () => {
-		if (!api) return
-		const res = await api.pick_save_file(['CSV files (*.csv)'])
-		if (!res.ok || !res.data) return
-		const exportRes = await api.export_csv('bin', res.data)
-		if (!exportRes.ok) alert(exportRes.error)
+	const exportBinCsv = async () => {
+		if (!api || !selectedBin) return
+		setExportMsg(null)
+		const res = await api.export_bin_csv(selectedBin.path)
+		setExportMsg(res.ok
+			? { ok: true, text: `Exported to ${res.data}` }
+			: { ok: false, text: res.error ?? 'Export failed' })
+	}
+
+	const exportAllBinCsv = async () => {
+		if (!api || !binDir) return
+		setExportAllLoading(true)
+		setExportAllResult(null)
+		const res = await api.export_all_bin_csv(binDir, fwVer)
+		if (res.ok && res.data) setExportAllResult(res.data)
+		else setExportAllResult({ csv_dir: '', results: [] })
+		setExportAllLoading(false)
 	}
 
 	// ── .fit handlers ──────────────────────────────────────────────────────────
@@ -202,62 +225,117 @@ export default function DataPanel() {
 				<>
 					<div className="card">
 						<div className="card-title">
-						Load Binary File
-						<InfoTip text="Select a raw .bin log file recorded by the device. The firmware version is detected automatically from the metadata file in the same folder — this is required to correctly decode the binary format." />
-					</div>
+							Binary Files
+							<InfoTip text="Select a folder containing .bin log files. Firmware version is detected automatically from metadata.txt in the same folder." />
+						</div>
 						<div className="row" style={{ marginBottom: 12 }}>
-							<button className="btn btn-secondary" onClick={pickBin}>Choose .bin file</button>
-							{binPath && <span className="mono muted">{binPath.split(/[\\/]/).pop()}</span>}
+							<button className="btn btn-secondary" onClick={pickBinDir}>Choose directory</button>
+							{binDir && <span className="mono muted" style={{ fontSize: 12 }}>{binDir}</span>}
 						</div>
 
-						{fwVerSource === 'default' && (
+						{binDir && fwVerSource === 'metadata' && (
+							<div className="alert alert-info" style={{ marginBottom: 12 }}>
+								Firmware: <span className="mono">{fwVer}</span> (from metadata)
+							</div>
+						)}
+						{binDir && fwVerSource === 'default' && (
 							<div className="alert alert-warning" style={{ marginBottom: 12 }}>
-								<div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: 16, rowGap: 2, marginBottom: 8 }}>
-									{recordingStart && (<>
-										<span className="muted" style={{ fontSize: 12 }}>Recorded</span>
-										<span className="mono">{recordingStart}</span>
-									</>)}
-									<span className="muted" style={{ fontSize: 12 }}>Firmware</span>
-									<span className="mono">{fwVer}</span>
-								</div>
 								No metadata file found — defaulting to <strong>std</strong> firmware.
 							</div>
 						)}
-						{fwVerSource === 'metadata' && (
-							<div className="alert alert-info" style={{ marginBottom: 12 }}>
-								<div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: 16, rowGap: 2 }}>
-									{recordingStart && (<>
-										<span className="muted" style={{ fontSize: 12 }}>Recorded</span>
-										<span className="mono">{recordingStart}</span>
-									</>)}
-									<span className="muted" style={{ fontSize: 12 }}>Firmware</span>
-									<span className="mono">{fwVer}</span>
-								</div>
-							</div>
+
+						{binDir && binFiles.length === 0 && (
+							<div className="muted" style={{ fontSize: 13 }}>No .bin files found in this directory.</div>
 						)}
 
-						<button
-							className="btn btn-primary"
-							onClick={parseBin}
-							disabled={!binPath || binLoading}
-						>
-							{binLoading ? <span className="spinner" /> : null}
-							{binLoading ? ' Parsing…' : ' Parse'}
-						</button>
-						{binError && <div className="alert alert-error" style={{ marginTop: 8 }}>{binError}</div>}
+						{binFiles.length > 0 && (
+							<>
+								<div className="table-wrap" style={{ maxHeight: 220, overflowY: 'auto', marginBottom: 12 }}>
+									<table>
+										<thead>
+											<tr>
+												<th>File</th>
+												<th>Recorded</th>
+												<th>Size</th>
+											</tr>
+										</thead>
+										<tbody>
+											{binFiles.map(f => {
+												const recorded = fmtBinTime(f.name)
+												const isSelected = selectedBin?.path === f.path
+												return (
+													<tr
+														key={f.path}
+														onClick={() => selectBin(f)}
+														style={{ cursor: 'pointer', background: isSelected ? 'var(--row-selected, #eff6ff)' : undefined }}
+													>
+														<td className="mono">{f.name}</td>
+														<td className="mono">{recorded ?? '—'}</td>
+														<td className="mono">{(f.size / 1024).toFixed(1)} KB</td>
+													</tr>
+												)
+											})}
+										</tbody>
+									</table>
+								</div>
+								<div className="row">
+									<button
+										className="btn btn-secondary"
+										onClick={exportAllBinCsv}
+										disabled={exportAllLoading}
+									>
+										{exportAllLoading
+											? <><span className="spinner spinner-dark" style={{ marginRight: 6 }} />Exporting…</>
+											: '⬇ Export All to CSV'}
+									</button>
+								</div>
+								{exportAllResult && (
+									<div style={{ marginTop: 10 }}>
+										{exportAllResult.csv_dir && (
+											<div className="alert alert-success" style={{ marginBottom: 8 }}>
+												Exported to <span className="mono">{exportAllResult.csv_dir}</span>
+											</div>
+										)}
+										{exportAllResult.results.some(r => !r.ok) && (
+											<div className="alert alert-warning">
+												{exportAllResult.results.filter(r => !r.ok).map(r => (
+													<div key={r.name}>{r.name}: {r.error}</div>
+												))}
+											</div>
+										)}
+									</div>
+								)}
+							</>
+						)}
 					</div>
 
-					{binResult && (
+					{binLoading && (
+						<div className="card">
+							<div className="row muted" style={{ fontSize: 13 }}>
+								<span className="spinner spinner-dark" style={{ marginRight: 8 }} />
+								Parsing {selectedBin?.name}…
+							</div>
+						</div>
+					)}
+
+					{binError && <div className="alert alert-error" style={{ marginBottom: 12 }}>{binError}</div>}
+
+					{binResult && selectedBin && (
 						<>
 							{/* Preview table */}
 							<div className="card">
-								<div className="row" style={{ marginBottom: 12 }}>
+								<div className="row" style={{ marginBottom: 8 }}>
 									<span className="card-title" style={{ margin: 0 }}>
-										Preview — {binResult.rows.toLocaleString()} rows · {binResult.columns.length} cols
+										{selectedBin.name} — {binResult.rows.toLocaleString()} rows · {binResult.columns.length} cols
 									</span>
 									<span className="spacer" />
-									<button className="btn btn-ghost" onClick={exportBin}>⬇ Export CSV</button>
+									<button className="btn btn-ghost" onClick={exportBinCsv}>⬇ Export CSV</button>
 								</div>
+								{exportMsg && (
+									<div className={`alert ${exportMsg.ok ? 'alert-success' : 'alert-error'}`} style={{ marginBottom: 8 }}>
+										{exportMsg.text}
+									</div>
+								)}
 								<div className="table-wrap" style={{ maxHeight: 220, overflowY: 'auto' }}>
 									<table>
 										<thead>

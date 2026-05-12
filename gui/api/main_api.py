@@ -198,6 +198,48 @@ class MainApi:
 
 	# ── Data ───────────────────────────────────────────────────────────────────
 
+	def list_bin_files(self, dir_path: str) -> dict:
+		"""Return all .bin files in dir_path sorted by name."""
+		try:
+			d = Path(dir_path)
+			files = sorted(d.glob("*.bin"), key=lambda f: f.name)
+			return ok([{"name": f.name, "size": f.stat().st_size, "path": str(f)} for f in files])
+		except Exception as e:
+			return err(str(e))
+
+	def export_bin_csv(self, bin_path: str) -> dict:
+		"""Export the cached bin DataFrame to {parent}/csv/{stem}.csv."""
+		if self._last_bin_df is None:
+			return err("No data to export — parse a file first.")
+		try:
+			p = Path(bin_path)
+			out_dir = p.parent / "csv"
+			out_dir.mkdir(parents=True, exist_ok=True)
+			out_path = out_dir / (p.stem + ".csv")
+			self._last_bin_df.to_csv(out_path, index=False)
+			return ok(str(out_path))
+		except Exception as e:
+			return err(str(e))
+
+	def export_all_bin_csv(self, dir_path: str, fw_ver: str = "std") -> dict:
+		"""Parse and export every .bin in dir_path to {dir_path}/csv/."""
+		try:
+			d = Path(dir_path)
+			out_dir = d / "csv"
+			out_dir.mkdir(parents=True, exist_ok=True)
+			results = []
+			for f in sorted(d.glob("*.bin"), key=lambda f: f.name):
+				try:
+					df = CassCommands.process_data_file(str(f), fw_ver)
+					out_path = out_dir / (f.stem + ".csv")
+					df.to_csv(out_path, index=False)
+					results.append({"name": f.name, "ok": True, "path": str(out_path)})
+				except Exception as e:
+					results.append({"name": f.name, "ok": False, "error": str(e)})
+			return ok({"csv_dir": str(out_dir), "results": results})
+		except Exception as e:
+			return err(str(e))
+
 	def parse_bin(self, path: str, fw_ver: str = "std") -> dict:
 		"""Parse a .bin file and cache the DataFrame server-side.
 
