@@ -44,37 +44,60 @@ python gui/app.py                  # loads from gui/frontend/dist/
 
 ## Releasing a new app version
 
-1. **Bump the version** in three places:
+### Using the release script (recommended)
 
-   | File | Field |
-   |------|-------|
-   | `gui/__version__.py` | `VERSION = "x.y.z"` |
-   | `pyproject.toml` | `version = "x.y.z"` |
-   | `gui/frontend/package.json` | `"version": "x.y.z"` |
+Use the release script — it bumps all three version files, commits, tags, and pushes in one step:
 
-   > `CassLogger.iss` (Windows installer) gets the version injected from the git tag by CI — no manual edit needed.
+```bash
+python3 scripts/release.py 0.2.0
+```
 
-   Tip: search the codebase for the current version string to find all three locations quickly.
+Optional flags:
 
-2. **Commit and tag**:
-   ```bash
-   git add gui/__version__.py pyproject.toml gui/frontend/package.json
-   git commit -m "Bump version to x.y.z"
-   git tag vx.y.z
-   git push origin main --tags
-   ```
+| Flag | Effect |
+|------|--------|
+| `-m "message"` | Custom commit and tag message (default: `bump to version v0.2.0`) |
+| `--force` | Overwrite an existing tag; also allows re-releasing the same version or a downgrade |
+| `--no-push` | Commit and tag locally, but do not push to remote |
+| `--dry-run` | Preview every action without making any changes |
+
+The script updates these three files automatically:
+
+| File | Field |
+|------|-------|
+| `gui/__version__.py` | `VERSION = "x.y.z"` |
+| `pyproject.toml` | `version = "x.y.z"` |
+| `gui/frontend/package.json` | `"version": "x.y.z"` |
+
+> `CassLogger.iss` (Windows installer) gets the version injected from the git tag by CI — no manual edit needed.
+
+It also guards against common mistakes: warns if you're not on `main`, errors on version downgrades or existing tags (both bypassable with `--force`), and alerts if staged changes would sneak into the version commit.
+
+### Manual release
+
+If you prefer to bump the version by hand, edit the three files above, then:
+
+```bash
+git add gui/__version__.py pyproject.toml gui/frontend/package.json
+git commit -m "bump to version vx.y.z"
+git tag -a vx.y.z -m "bump to version vx.y.z"
+git push origin main
+git push origin vx.y.z
+```
+
+To re-release an existing tag (e.g. after a quick fix on the same version):
+
+```bash
+git tag -af vx.y.z -m "bump to version vx.y.z"
+git push origin vx.y.z --force
+```
+
+### CI trigger
 
 GitHub Actions triggers on the tag, builds macOS (DMG) and Windows (installer) artifacts, and publishes a GitHub release automatically.
 
-To re-release the same tag for a new commit (if a quick bug fix has been made to fix a production issue), do this after committing:
-
 > [!IMPORTANT]
-> Forcing a release in this way will not trigger an auto update in the app! If you want your change to auto update through the app, you need to release a new version.
-
-   ```bash
-   git tag -f vx.y.z
-   git push origin main -f refs/tags/vx.y.z
-   ```
+> Forcing a re-release with `--force` (script) or `git push --force` (manual) will **not** trigger an auto-update in the app. If you want users to receive the update automatically, release a new version number instead.
 
 ## Releasing new firmware
 

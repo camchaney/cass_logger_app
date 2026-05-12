@@ -146,6 +146,10 @@ def main() -> None:
 		help="Overwrite existing tag and allow version downgrades",
 	)
 	parser.add_argument(
+		"--no-push", action="store_true",
+		help="Commit and tag locally, but do not push to remote",
+	)
+	parser.add_argument(
 		"--dry-run", action="store_true",
 		help="Show what would happen without making any changes",
 	)
@@ -165,6 +169,8 @@ def main() -> None:
 	print(f"  Message : {message}")
 	if dry:
 		print("  Mode    : DRY RUN")
+	elif args.no_push:
+		print("  Mode    : local only (--no-push)")
 	print()
 
 	# ── Validations ───────────────────────────────────────────────────────
@@ -227,7 +233,9 @@ def main() -> None:
 		print(f"Would commit:  \"{message}\"")
 		action = "force-create" if args.force else "create"
 		print(f"Would tag:     {action} {tag}")
-		if remote_exists():
+		if args.no_push:
+			print("Would skip push: --no-push")
+		elif remote_exists():
 			push_flags = " --force" if args.force else ""
 			print(f"Would push:    origin/{branch}{push_flags}")
 			print(f"Would push:    tag {tag}{push_flags}")
@@ -260,31 +268,37 @@ def main() -> None:
 		die("git tag failed — see output above.")
 
 	# ── Push ──────────────────────────────────────────────────────────────
+	force_flag = " --force" if args.force else ""
+
+	if args.no_push:
+		print(f"\n✓  v{new_ver} committed and tagged locally.")
+		print(f"   To push when ready:")
+		print(f"     git push origin {branch}{force_flag}")
+		print(f"     git push origin {tag}{force_flag}")
+		return
+
 	if not remote_exists():
 		print("\nNo remote configured — skipping push.")
 		print(f"\n✓  v{new_ver} committed and tagged locally.")
 		return
 
 	print(f"\nPushing to origin/{branch}...")
-	result = git("push", "origin", branch)
+	result = git("push", "origin", branch, *( ["--force"] if args.force else []))
 	if result.returncode != 0:
 		die(
 			f"git push failed.\n"
 			"       The version files and tag were committed locally. Fix the push issue and run:\n"
-			f"         git push origin {branch}\n"
-			f"         git push origin {tag}" + (" --force" if args.force else "")
+			f"         git push origin {branch}{force_flag}\n"
+			f"         git push origin {tag}{force_flag}"
 		)
 
 	print(f"Pushing tag {tag}...")
-	push_tag_cmd = ["push", "origin", tag]
-	if args.force:
-		push_tag_cmd.append("--force")
-	result = git(*push_tag_cmd)
+	result = git("push", "origin", tag, *(["--force"] if args.force else []))
 	if result.returncode != 0:
 		die(
 			f"Tag push failed.\n"
 			"       The commit was pushed. Fix the issue and run:\n"
-			f"         git push origin {tag}" + (" --force" if args.force else "")
+			f"         git push origin {tag}{force_flag}"
 		)
 
 	print(f"\n✓  Released v{new_ver}")
