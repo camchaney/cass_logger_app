@@ -288,10 +288,9 @@ export default function DevicePanel({ status, onConnected }: Props) {
 			</div>
 
 			{/* Windows diagnostics */}
-			<div className="card" style={!isWindows ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
+			{isWindows && <div className="card">
 				<div className="row" style={{ marginBottom: 8 }}>
 					<span className="card-title" style={{ margin: 0 }}>Windows Diagnostics</span>
-					{!isWindows && <span className="muted" style={{ fontSize: 12 }}>Windows only</span>}
 				</div>
 				<p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
 					Shows detailed COM port info to help identify the correct ports on Windows.
@@ -323,17 +322,16 @@ export default function DevicePanel({ status, onConnected }: Props) {
 						</table>
 					</div>
 				)}
-			</div>
+			</div>}
 
-			<div style={{ marginTop: 24 }}>
+			<div style={{ marginTop: 24, ...(!status.connected ? { opacity: 0.45, pointerEvents: 'none' } : {}) }}>
 				<FirmwarePanel status={status} />
 			</div>
 
 			{/* ── Configuration ─────────────────────────────────────────────────────── */}
 
-			{status.connected && (
-				<>
-					<h2 className="panel-title" style={{ marginTop: 8 }}>Configuration</h2>
+			<div style={!status.connected ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
+				<h2 className="panel-title" style={{ marginTop: 8 }}>Configuration</h2>
 
 					{/* RTC */}
 					<div className="card">
@@ -450,8 +448,7 @@ export default function DevicePanel({ status, onConnected }: Props) {
 							</div>
 						)}
 					</div>
-				</>
-			)}
+			</div>
 		</div>
 	)
 }
