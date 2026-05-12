@@ -175,6 +175,23 @@ def main() -> None:
 
 	# ── Validations ───────────────────────────────────────────────────────
 
+	# Force confirmation
+	if args.force and not dry:
+		reasons = []
+		if new_tuple < cur_tuple:
+			reasons.append(f"downgrade from v{cur_ver} to v{new_ver}")
+		elif new_tuple == cur_tuple:
+			reasons.append(f"re-release of existing version v{new_ver}")
+		if tag_exists(tag):
+			reasons.append(f"overwrite existing tag {tag}")
+		reason_str = " and ".join(reasons) if reasons else "force flag is set"
+		print(f"WARNING: --force will {reason_str}.")
+		if not args.no_push and remote_exists():
+			print("         This will force-push the tag to the remote.")
+		if not _confirm("Proceed?"):
+			sys.exit("Aborted.")
+		print()
+
 	# Version ordering
 	if new_tuple < cur_tuple and not args.force:
 		die(
