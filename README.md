@@ -68,7 +68,7 @@ GitHub Actions triggers on the tag, builds macOS (DMG) and Windows (installer) a
 
 To re-release the same tag for a new commit (if a quick bug fix has been made to fix a production issue), do this after committing:
 
-> :IMPORTANT:
+> [!IMPORTANT:]
 > Forcing a release in this way will not trigger an auto update in the app! If you want your change to auto update through the app, you need to release a new version.
 
    ```bash
