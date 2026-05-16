@@ -43,9 +43,28 @@ jobs:
       - name: Remove obsolete pathlib backport
         run: pip uninstall -y pathlib || true
 
-      - name: Install teensy_loader_cli (macOS)
+      - name: Build universal teensy_loader_cli (macOS)
         if: runner.os == 'macOS'
-        run: brew install teensy_loader_cli
+        run: |
+          # ARM64 binary from Homebrew
+          brew install teensy_loader_cli
+          ARM64="$(brew --prefix)/bin/teensy_loader_cli"
+
+          # Cross-compile x86_64 from source (ARM64 runners support x86_64 targeting via clang)
+          git clone --depth=1 https://github.com/PaulStoffregen/teensy_loader_cli /tmp/teensy_src
+          # Pass the target via both CFLAGS and LDFLAGS so it reaches compile + link
+          make -C /tmp/teensy_src \
+            CC="clang -target x86_64-apple-macos10.15" \
+            CFLAGS="-O2" \
+            LDFLAGS="-target x86_64-apple-macos10.15"
+          X86="/tmp/teensy_src/teensy_loader_cli"
+
+          # Merge into a universal (fat) binary
+          mkdir -p bin/tool-teensy
+          lipo -create -output bin/tool-teensy/teensy_loader_cli "$ARM64" "$X86"
+          chmod +x bin/tool-teensy/teensy_loader_cli
+          echo "Binary type:"
+          file bin/tool-teensy/teensy_loader_cli
 
       - name: Fetch Teensy flash tools
         run: python scripts/fetch_teensy_tools.py
